@@ -1,4 +1,5 @@
 // demo数据，由多个csv解析
+import { MeituanOrder, MeituanProcessOutput, FunctionArgs } from '../../types';
 
 const demo = {
   input: [
@@ -20,22 +21,8 @@ const demo = {
     },
   ],
 };
-type Args = { params: { input: string[] } };
-type Output = {
-  output: {
-    支付方式: string;
-    实付金额: string;
-    备注: string;
-    订单标题: string;
-    交易创建时间: string;
-    交易成功时间: string;
-    交易类型: string;
-    '收/支': string;
-    订单金额: string;
-    交易单号: string;
-    商家单号: string;
-  }[];
-};
+type Args = FunctionArgs<{ input: string[] }>;
+type Output = MeituanProcessOutput;
 
 import dayjs from 'dayjs';
 

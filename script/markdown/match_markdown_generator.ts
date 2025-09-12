@@ -1,4 +1,6 @@
 // 根据文件处理的输出，生成markdown组件使用的字符串
+import { MeituanOrder, MarkdownGeneratorInput, MarkdownGeneratorOutput } from '../../types';
+
 const demo = {
   input: [
     {
@@ -38,15 +40,8 @@ const demo = {
   ],
 };
 
-type Args = {
-  params: {
-    input: Object[];
-    newlineType?: 'natural' | 'unicode' | 'unicode2' | 'unicode3' | 'crlf' | 'lf' | 'cr';
-  };
-};
-type Output = {
-  output: string;
-};
+type Args = MarkdownGeneratorInput;
+type Output = MarkdownGeneratorOutput;
 
 /**
  * 根据换行类型获取换行符
@@ -114,7 +109,7 @@ function generateMarkdownTable(data: Object[], newlineType: string): string {
       if (value === null || value === undefined) {
         return '';
       }
-      let processedValue = String(value);
+      const processedValue = String(value);
       return processedValue;
     });
     return `| ${values.join(' | ')} |`;

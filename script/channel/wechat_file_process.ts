@@ -1,4 +1,5 @@
 // 微信支付demo数据，由单个xlsx解析出起止日期，还有每条交易流水详情
+import { WechatPayment, ChannelProcessOutput, FunctionArgs } from '../../types';
 
 const demo = {
   input:
@@ -24,27 +25,8 @@ const demo = {
   },
 };
 
-type Args = { params: { input: string } };
-type Output = {
-  output: {
-    channel: string;
-    date: string[];
-    data: {
-      交易时间: string;
-      '金额(元)': string;
-      支付方式: string;
-      商户单号: string;
-      备注: string;
-      当前状态: string;
-      交易类型: string;
-      交易对方: string;
-      商品: string;
-      '收/支': string;
-      交易单号: string;
-      数据来源: string;
-    }[];
-  };
-};
+type Args = FunctionArgs<{ input: string }>;
+type Output = ChannelProcessOutput<WechatPayment>;
 
 async function main({ params }: Args): Promise<Output> {
   const { input } = params;

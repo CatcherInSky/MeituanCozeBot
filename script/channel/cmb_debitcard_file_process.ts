@@ -1,4 +1,6 @@
 // 招商银行储蓄卡demo数据处理，由单个pdf解析出起止日期，还有每条交易流水详情
+import { CmbDebitCardPayment, ChannelProcessOutput, FunctionArgs } from '../../types';
+
 const demo = {
   input:
     '\n\n1/16\n招商银行交易流水\nTransaction Statement of China Merchants Bank\n2024-09-06 -- 2025-09-06\n户  名：XXX\nName\n账户类型：ALL/全币种\nAccount Type\n申请时间：2025-09-08 19:15:51\nDate\n账号：65\nAccount No\n开 户 行：支行\nSub Branch\n验 证 码：111\nVerification Code\n记账日期货币交易金额联机余额交易摘要对手信息\nDateCurrency\nTransaction\nAmount\nBalanceTransaction TypeCounter Party\n2024-09-15CNY-50.00760.81快捷支付岭南通 123\n',
@@ -17,22 +19,8 @@ const demo = {
     ],
   },
 };
-type Args = { params: { input: string } };
-type Output = {
-  output: {
-    channel: string;
-    date: string[];
-    data: {
-      记账日期: string;
-      货币: string;
-      交易金额: string;
-      联机余额: string;
-      交易摘要: string;
-      对手信息: string;
-      数据来源: string;
-    }[];
-  };
-};
+type Args = FunctionArgs<{ input: string }>;
+type Output = ChannelProcessOutput<CmbDebitCardPayment>;
 
 async function main({ params }: Args): Promise<Output> {
   const { input } = params;

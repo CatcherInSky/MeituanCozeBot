@@ -2,11 +2,10 @@
  * 根据文件URL判断支付渠道
  * 通过解析URL中的x-wf-file_name参数，根据文件名特征判断支付渠道类型
  */
-type Args = { params: { input: string } };
-type Output = {
-  output: '' | '微信支付' | '支付宝' | '招商银行储蓄卡' | '招商银行信用卡';
-  // | '广发银行信用卡' | '中国建设银行储蓄卡' | '中国银行储蓄卡';
-};
+import { PaymentChannel, UrlBranchOutput, FunctionArgs } from '../types';
+
+type Args = FunctionArgs<{ input: string }>;
+type Output = UrlBranchOutput;
 
 /**
  * 从URL中提取文件名
@@ -32,7 +31,7 @@ function extractFileName(url: string): string {
  * @param fileName 文件名
  * @returns 支付渠道类型
  */
-function detectPaymentChannel(fileName: string): Output['output'] {
+function detectPaymentChannel(fileName: string): PaymentChannel | '' {
   if (!fileName) return ''; // 默认返回
 
   const lowerFileName = fileName.toLowerCase();

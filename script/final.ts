@@ -1,4 +1,16 @@
 // 美团订单与支付渠道数据匹配处理
+import {
+  MeituanOrder,
+  PaymentData,
+  AggregatedChannelData,
+  FinalOutput,
+  FunctionArgs,
+  ChannelDataGroup,
+  MatchResult,
+  PaymentChannel,
+  getPaymentAmount,
+  getPaymentTime,
+} from '../types';
 
 const demo = {
   meituan: [
@@ -16,45 +28,43 @@ const demo = {
       支付方式: '招商银行储蓄卡()',
     },
   ],
-  input: [
-    {
-      Group1: {
-        channel: '微信支付',
-        date: ['2025-06-08 00:00:00', '2025-09-08 23:59:59'],
-        data: [
-          {
-            交易时间: '2025-09-08 15:53:25',
-            '金额(元)': '¥70.56',
-            支付方式: '招商银行储蓄卡()',
-            商户单号: '040',
-            备注: '/',
-            当前状态: '支付成功',
-            交易类型: '商户消费',
-            交易对方: '朴朴超市',
-            商品: '朴朴商品订单',
-            '收/支': '支出',
-            交易单号: '420000',
-            数据来源: '微信支付',
-          },
-        ],
-      },
-      Group2: {
-        channel: '招商银行储蓄卡',
-        date: ['2024-09-06 00:00:00', '2025-09-06 23:59:59'],
-        data: [
-          {
-            记账日期: '2024-09-15',
-            货币: 'CNY',
-            交易金额: '-50.00',
-            联机余额: '760.81',
-            交易摘要: '快捷支付岭南通',
-            对手信息: '123',
-            数据来源: '招商银行储蓄卡',
-          },
-        ],
-      },
+  input: {
+    Group1: {
+      channel: '微信支付' as PaymentChannel,
+      date: ['2025-06-08 00:00:00', '2025-09-08 23:59:59'] as [string, string],
+      data: [
+        {
+          交易时间: '2025-09-08 15:53:25',
+          '金额(元)': '¥70.56',
+          支付方式: '招商银行储蓄卡()',
+          商户单号: '040',
+          备注: '/',
+          当前状态: '支付成功',
+          交易类型: '商户消费',
+          交易对方: '朴朴超市',
+          商品: '朴朴商品订单',
+          '收/支': '支出',
+          交易单号: '420000',
+          数据来源: '微信支付',
+        },
+      ] as PaymentData[],
     },
-  ],
+    Group2: {
+      channel: '招商银行储蓄卡' as PaymentChannel,
+      date: ['2024-09-06 00:00:00', '2025-09-06 23:59:59'] as [string, string],
+      data: [
+        {
+          记账日期: '2024-09-15',
+          货币: 'CNY',
+          交易金额: '-50.00',
+          联机余额: '760.81',
+          交易摘要: '快捷支付岭南通',
+          对手信息: '123',
+          数据来源: '招商银行储蓄卡',
+        },
+      ] as PaymentData[],
+    },
+  } as AggregatedChannelData,
   output: {
     multichannel: [],
     match: [],
@@ -63,14 +73,9 @@ const demo = {
   },
 };
 
-type Args = { params: { input: any; meituan: any[] } };
+type Args = FunctionArgs<{ input: AggregatedChannelData; meituan: MeituanOrder[] }>;
 type Output = {
-  output: {
-    multichannel: any[];
-    match: any[][];
-    unmatch: any[];
-    uncover: any[];
-  };
+  output: FinalOutput;
 };
 
 /**
@@ -132,43 +137,53 @@ function isAmountMatch(amount1: string, amount2: string): boolean {
  * @param channel 渠道
  * @returns 是否匹配
  */
-function isOrderMatchPaymentData(meituanOrder: any, paymentData: any, channel: string): boolean {
+function isOrderMatchPaymentData(
+  meituanOrder: MeituanOrder,
+  paymentData: PaymentData,
+  channel: string
+): boolean {
   // 基础匹配：金额和时间
   const amountMatch = isAmountMatch(
     meituanOrder['实付金额'] || meituanOrder['订单金额'],
-    paymentData['金额(元)'] || paymentData['交易金额']
+    getPaymentAmount(paymentData)
   );
 
   if (!amountMatch) return false;
 
   // 根据渠道定制匹配规则
   switch (channel) {
-    case '微信支付':
+    case '微信支付': {
       // 微信支付匹配规则：金额 + 交易时间
+      const wechatTime = getPaymentTime(paymentData);
       const wechatTimeMatch = isTimeInRange(
         meituanOrder['交易成功时间'] || meituanOrder['交易创建时间'],
-        paymentData['交易时间'],
-        paymentData['交易时间']
+        wechatTime,
+        wechatTime
       );
       return wechatTimeMatch;
+    }
 
-    case '招商银行储蓄卡':
+    case '招商银行储蓄卡': {
       // 招商银行储蓄卡匹配规则：金额 + 交易日期
+      const cmbTime = getPaymentTime(paymentData);
       const cmbTimeMatch = isTimeInRange(
         meituanOrder['交易成功时间'] || meituanOrder['交易创建时间'],
-        paymentData['记账日期'] + ' 00:00:00',
-        paymentData['记账日期'] + ' 23:59:59'
+        cmbTime + ' 00:00:00',
+        cmbTime + ' 23:59:59'
       );
       return cmbTimeMatch;
+    }
 
-    case '招商银行信用卡':
+    case '招商银行信用卡': {
       // 招商银行信用卡匹配规则：金额 + 交易时间
+      const cmbCreditTime = getPaymentTime(paymentData);
       const cmbCreditTimeMatch = isTimeInRange(
         meituanOrder['交易成功时间'] || meituanOrder['交易创建时间'],
-        paymentData['交易成功时间'] || paymentData['交易创建时间'],
-        paymentData['交易成功时间'] || paymentData['交易创建时间']
+        cmbCreditTime + ' 00:00:00',
+        cmbCreditTime + ' 23:59:59'
       );
       return cmbCreditTimeMatch;
+    }
     // todo 新增
     default:
       // 默认匹配规则：仅金额
@@ -180,32 +195,30 @@ async function main({ params }: Args): Promise<Output> {
   const { input, meituan } = params;
 
   // 步骤1：收集所有支付渠道数据到multichannel数组
-  const multichannel: any[] = [];
-  const channelGroups: Array<{ channel: string; date: string[]; data: any[] }> = [];
+  const multichannel: PaymentData[] = [];
+  const channelGroups: ChannelDataGroup[] = [];
 
-  // 遍历input数组中的每个Group
-  for (const group of input as any[]) {
-    for (const groupKey in group) {
-      if (group.hasOwnProperty(groupKey)) {
-        const groupValue = group[groupKey];
-        if (groupValue && typeof groupValue === 'object' && 'channel' in groupValue) {
-          const channelData = groupValue as { channel: string; date: string[]; data: any[] };
-          channelGroups.push(channelData);
-          multichannel.push(...channelData.data);
-        }
+  // 遍历input对象中的每个Group
+  for (const groupKey in input) {
+    if (Object.prototype.hasOwnProperty.call(input, groupKey)) {
+      const groupValue = input[groupKey];
+      if (groupValue && typeof groupValue === 'object' && 'channel' in groupValue) {
+        const channelData = groupValue as ChannelDataGroup;
+        channelGroups.push(channelData);
+        multichannel.push(...channelData.data);
       }
     }
   }
 
   // 步骤2：初始化结果数组
-  const match: any[][] = [];
-  const unmatch: any[] = [];
-  const uncover: any[] = [];
+  const match: MatchResult[] = [];
+  const unmatch: MeituanOrder[] = [];
+  const uncover: MeituanOrder[] = [];
 
   // 步骤3：遍历每个美团订单进行匹配
   for (const meituanOrder of meituan) {
     let isMatched = false;
-    let matchedPaymentData: any = null;
+    let matchedPaymentData: PaymentData | null = null;
     let matchedChannel = '';
 
     // 步骤3.1：检查支付方式是否匹配任何渠道
@@ -245,7 +258,7 @@ async function main({ params }: Args): Promise<Output> {
     }
 
     // 步骤3.6：根据匹配结果分类
-    if (isMatched) {
+    if (isMatched && matchedPaymentData) {
       // 匹配成功：加入match数组
       match.push([meituanOrder, matchedPaymentData]);
     } else {
