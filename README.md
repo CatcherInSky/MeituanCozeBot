@@ -1,6 +1,22 @@
 # MeituanCozeBot
 记录coze判断美团退款数据bot中使用的函数
 
+# 项目结构
+
+```
+script/
+├── channel/           # 支付渠道数据处理
+│   ├── wechat_file_process.ts
+│   ├── cmb_debitcard_file_process.ts
+│   └── meituan_filelist_process.ts
+├── markdown/          # Markdown生成器
+│   ├── meituan_markdown_generator.ts
+│   ├── match_markdown_generator.ts
+│   ├── unmatch_markdown_generator.ts
+│   └── uncover_markdown_generator.ts
+└── final.ts           # 最终匹配处理
+```
+
 # 数据流向
 meituan_filelist_process -> meituan_markdown_generator
 meituan_filelist_process -> final
@@ -10,7 +26,6 @@ final -> match_markdown_generator
 final -> multichannel_markdown_generator
 final -> uncover_markdown_generator
 final -> unmatch_markdown_generator
-
 
 # 如何新增渠道
 ## 代码修改

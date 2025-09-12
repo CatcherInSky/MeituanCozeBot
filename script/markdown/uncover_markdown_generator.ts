@@ -1,25 +1,28 @@
 // 根据文件处理的输出，生成markdown组件使用的字符串
 const demo = {
-    input:  [
-          {
-            "交易创建时间": "2025-03-10 06:59:59",
-            "支付方式": "招商银行信用卡()",
-            "实付金额": "¥8.00",
-            "备注": "/",
-            "订单标题": "【新品￥8】1份滑蛋乳酪云朵汤种吐司",
-            "交易成功时间": "2025-03-10 07:00:01",
-            "交易类型": "退款",
-            "收/支": "收入",
-            "订单金额": "¥8.00",
-            "交易单号": "2503625",
-            "商家单号": "498A"
-          },
-        ]
-      
-}
+  input: [
+    {
+      交易创建时间: '2025-03-10 06:59:59',
+      支付方式: '招商银行信用卡()',
+      实付金额: '¥8.00',
+      备注: '/',
+      订单标题: '【新品￥8】1份滑蛋乳酪云朵汤种吐司',
+      交易成功时间: '2025-03-10 07:00:01',
+      交易类型: '退款',
+      '收/支': '收入',
+      订单金额: '¥8.00',
+      交易单号: '2503625',
+      商家单号: '498A',
+    },
+  ],
+};
 
-
-type Args = { params: { input: Object[], newlineType?: 'natural' | 'unicode' | 'unicode2' | 'unicode3' | 'crlf' | 'lf' | 'cr' } };
+type Args = {
+  params: {
+    input: Object[];
+    newlineType?: 'natural' | 'unicode' | 'unicode2' | 'unicode3' | 'crlf' | 'lf' | 'cr';
+  };
+};
 type Output = {
   output: string;
 };
@@ -32,19 +35,19 @@ type Output = {
 function getNewlineChar(newlineType: string = 'natural'): string {
   switch (newlineType) {
     case 'natural':
-      return '\n';  // 真正的换行符
+      return '\n'; // 真正的换行符
     case 'unicode':
-      return '\u000A';  // Unicode换行符
+      return '\u000A'; // Unicode换行符
     case 'unicode2':
-      return '\u2028';  // Unicode行分隔符
+      return '\u2028'; // Unicode行分隔符
     case 'unicode3':
-      return '\u2029';  // Unicode段落分隔符
+      return '\u2029'; // Unicode段落分隔符
     case 'crlf':
-      return '\r\n';    // Windows换行符
+      return '\r\n'; // Windows换行符
     case 'lf':
-      return '\n';      // Unix换行符
+      return '\n'; // Unix换行符
     case 'cr':
-      return '\r';      // Mac换行符
+      return '\r'; // Mac换行符
     default:
       return '\n';
   }
@@ -64,7 +67,7 @@ function generateMarkdownTable(data: Object[], newlineType: string): string {
   // 定义列的顺序
   const columnOrder = [
     '交易成功时间',
-    '交易创建时间', 
+    '交易创建时间',
     '订单金额',
     '实付金额',
     '订单标题',
@@ -73,15 +76,15 @@ function generateMarkdownTable(data: Object[], newlineType: string): string {
     '商家单号',
     '交易类型',
     '收/支',
-    '支付方式'
+    '支付方式',
   ];
 
   // 生成表头
   const header = `| ${columnOrder.join(' | ')} |`;
-  
+
   // 生成分隔线
   const separator = `| ${columnOrder.map(() => '---').join(' | ')} |`;
-  
+
   // 生成数据行
   const rows = data.map(item => {
     const values = columnOrder.map(key => {
@@ -109,7 +112,7 @@ function generateMarkdownTable(data: Object[], newlineType: string): string {
  */
 function groupByPaymentMethod(data: Object[]): Record<string, Object[]> {
   const groups: Record<string, Object[]> = {};
-  
+
   data.forEach(item => {
     const paymentMethod = String(item['支付方式' as keyof typeof item] || '未知支付方式');
     if (!groups[paymentMethod]) {
@@ -117,7 +120,7 @@ function groupByPaymentMethod(data: Object[]): Record<string, Object[]> {
     }
     groups[paymentMethod].push(item);
   });
-  
+
   return groups;
 }
 
@@ -134,61 +137,58 @@ function sortBySuccessTime(data: Object[]): Object[] {
   });
 }
 
-
 async function main({ params }: Args): Promise<Output> {
   const { input } = params;
   const newlineType = 'unicode';
-  
+
   try {
     // 验证输入数据
     if (!Array.isArray(input)) {
       return {
-        output: '错误：输入数据必须是数组格式'
+        output: '错误：输入数据必须是数组格式',
       };
     }
 
     // 过滤掉无效数据
-    const validData = input.filter(item => 
-      item && 
-      typeof item === 'object' && 
-      !Array.isArray(item) &&
-      Object.keys(item).length > 0
+    const validData = input.filter(
+      item =>
+        item && typeof item === 'object' && !Array.isArray(item) && Object.keys(item).length > 0
     );
 
     if (validData.length === 0) {
       return {
-        output: '错误：没有找到有效的对象数据'
+        output: '错误：没有找到有效的对象数据',
       };
     }
 
     // 按支付方式分组
     const groupedData = groupByPaymentMethod(validData);
     const newlineChar = getNewlineChar(newlineType);
-    
+
     // 生成主标题
     let markdown = `# 时间和支付方式未覆盖退款数据详情${newlineChar}${newlineChar}`;
-    
+
     // 为每个支付方式生成表格
     const paymentMethods = Object.keys(groupedData).sort(); // 按支付方式名称排序
-    
+
     for (const paymentMethod of paymentMethods) {
       const data = groupedData[paymentMethod];
       // 按交易成功时间降序排序
       const sortedData = sortBySuccessTime(data);
-      
+
       // 生成表格
       const table = generateMarkdownTable(sortedData, newlineType);
-      
+
       // 添加支付方式标题和表格
       markdown += `## ${paymentMethod}${newlineChar}${newlineChar}${table}${newlineChar}${newlineChar}`;
     }
-    
+
     return {
-      output: markdown
+      output: markdown,
     };
   } catch (error) {
     return {
-      output: `错误：${error instanceof Error ? error.message : '未知错误'}`
+      output: `错误：${error instanceof Error ? error.message : '未知错误'}`,
     };
   }
 }
