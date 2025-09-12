@@ -307,12 +307,13 @@ function sortBySuccessTime(data: MatchResult[]): MatchResult[] {
 async function main({ params }: Args): Promise<Output> {
   const { input } = params;
   const newlineType = 'unicode';
+  const newlineChar = getNewlineChar(newlineType);
 
   try {
     // 验证输入数据
     if (!Array.isArray(input)) {
       return {
-        output: '错误：输入数据必须是数组格式',
+        output: `# 已匹配订单数据详情${newlineChar}${newlineChar}错误：输入数据必须是数组格式`,
       };
     }
 
@@ -326,13 +327,12 @@ async function main({ params }: Args): Promise<Output> {
 
     if (validData.length === 0) {
       return {
-        output: '错误：没有找到有效的匹配数据',
+        output: `# 已匹配订单数据详情${newlineChar}${newlineChar}没有匹配数据`,
       };
     }
 
     // 按数据来源分组
     const groupedData = groupByDataSource(validData);
-    const newlineChar = getNewlineChar(newlineType);
 
     // 生成主标题
     let markdown = `# 已匹配订单数据详情${newlineChar}${newlineChar}`;
