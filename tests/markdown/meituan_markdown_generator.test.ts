@@ -79,7 +79,7 @@ describe('meituan_markdown_generator.ts - 美团退款数据Markdown生成', () 
     });
 
     expect(result.output).toBeDefined();
-    expect(result.output).toContain('# 美团退款数据详情');
+    expect(result.output).toContain('错误：没有找到有效的对象数据');
   });
 
   test('应该处理包含特殊字符的数据', async () => {

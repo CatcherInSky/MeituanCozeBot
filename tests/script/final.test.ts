@@ -98,7 +98,7 @@ describe('script/final.ts - 类型守卫和工具函数', () => {
         // 在这个块中，TypeScript应该知道paymentData是WechatPayment类型
         expect(paymentData.交易时间).toBeDefined();
         expect(paymentData['金额(元)']).toBeDefined();
-        // @ts-expect-error - 这些字段不应该存在于WechatPayment中
+        // 这些字段不应该存在于WechatPayment中
         // expect(paymentData.记账日期).toBeDefined();
       }
 

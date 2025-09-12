@@ -104,16 +104,25 @@ export interface ChannelDataGroup {
 }
 
 /**
- * 聚合后的渠道数据（用于final.ts的输入）
+ * 单个Group对象的结构
  */
-export interface AggregatedChannelData {
-  [key: string]: ChannelDataGroup | null;
+export interface GroupData {
+  [key: string]: ChannelDataGroup | null | undefined;
 }
+
+/**
+ * 聚合后的渠道数据（用于final.ts的输入）
+ * 实际是一个包含多个Group对象的数组
+ */
+export type AggregatedChannelData = GroupData[];
 
 /**
  * 匹配结果（美团订单与支付数据的配对）
  */
-export type MatchResult = [MeituanOrder, PaymentData];
+export type MatchResult = {
+  '美团': MeituanOrder;
+  [key: string]: MeituanOrder | PaymentData;
+};
 
 /**
  * final.ts的输出格式
@@ -156,7 +165,6 @@ export interface UrlBranchOutput {
 export interface MarkdownGeneratorInput {
   params: {
     input: any[];
-    newlineType?: 'natural' | 'unicode' | 'unicode2' | 'unicode3' | 'crlf' | 'lf' | 'cr';
   };
 }
 
@@ -181,56 +189,3 @@ export interface FunctionOutput<T = any> {
   output: T;
 }
 
-/**
- * 类型守卫函数：检查是否为微信支付数据
- */
-export function isWechatPayment(data: PaymentData): data is WechatPayment {
-  return '交易时间' in data && '金额(元)' in data && data.数据来源 === '微信支付';
-}
-
-/**
- * 类型守卫函数：检查是否为招商银行储蓄卡数据
- */
-export function isCmbDebitCardPayment(data: PaymentData): data is CmbDebitCardPayment {
-  return '记账日期' in data && '交易金额' in data && data.数据来源 === '招商银行储蓄卡';
-}
-
-/**
- * 类型守卫函数：检查是否为招商银行信用卡数据
- */
-export function isCmbCreditCardPayment(data: PaymentData): data is CmbCreditCardPayment {
-  return '记账日期' in data && '交易金额' in data && data.数据来源 === '招商银行信用卡';
-}
-
-/**
- * 类型守卫函数：检查是否为支付宝数据
- */
-export function isAlipayPayment(data: PaymentData): data is AlipayPayment {
-  return '交易时间' in data && '金额(元)' in data && data.数据来源 === '支付宝';
-}
-
-/**
- * 获取支付数据的金额字段
- */
-export function getPaymentAmount(data: PaymentData): string {
-  if (isWechatPayment(data) || isAlipayPayment(data)) {
-    return data['金额(元)'];
-  }
-  if (isCmbDebitCardPayment(data) || isCmbCreditCardPayment(data)) {
-    return data.交易金额;
-  }
-  return '';
-}
-
-/**
- * 获取支付数据的时间字段
- */
-export function getPaymentTime(data: PaymentData): string {
-  if (isWechatPayment(data) || isAlipayPayment(data)) {
-    return data.交易时间;
-  }
-  if (isCmbDebitCardPayment(data) || isCmbCreditCardPayment(data)) {
-    return data.记账日期;
-  }
-  return '';
-}
