@@ -1,6 +1,17 @@
 # MeituanCozeBot
 记录coze判断美团退款数据bot中使用的函数
 
+# 数据流向
+meituan_filelist_process -> meituan_markdown_generator
+meituan_filelist_process -> final
+cmb_debitcard_file_process -> final
+wechat_file_process -> final
+final -> match_markdown_generator
+final -> multichannel_markdown_generator
+final -> uncover_markdown_generator
+final -> unmatch_markdown_generator
+
+
 # 如何新增渠道
 ## 代码修改
 ### url_branch
