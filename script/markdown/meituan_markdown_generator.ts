@@ -1,23 +1,7 @@
 // 根据文件处理的输出，生成markdown组件使用的字符串
 import { MeituanOrder, MarkdownGeneratorInput, MarkdownGeneratorOutput } from '../../types';
 
-const demo = {
-  input: [
-    {
-      交易创建时间: '2025-03-10 06:59:59',
-      支付方式: '招商银行信用卡()',
-      实付金额: '¥8.00',
-      备注: '/',
-      订单标题: '【新品￥8】1份滑蛋乳酪云朵汤种吐司',
-      交易成功时间: '2025-03-10 07:00:01',
-      交易类型: '退款',
-      '收/支': '收入',
-      订单金额: '¥8.00',
-      交易单号: '2503625',
-      商家单号: '498A',
-    },
-  ],
-};
+// Demo数据已移至测试用例中
 
 type Args = MarkdownGeneratorInput;
 type Output = MarkdownGeneratorOutput;
@@ -187,3 +171,5 @@ async function main({ params }: Args): Promise<Output> {
     };
   }
 }
+
+export default main;

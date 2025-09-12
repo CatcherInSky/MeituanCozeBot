@@ -1,24 +1,7 @@
 // 招商银行储蓄卡demo数据处理，由单个pdf解析出起止日期，还有每条交易流水详情
 import { CmbDebitCardPayment, ChannelProcessOutput, FunctionArgs } from '../../types';
 
-const demo = {
-  input:
-    '\n\n1/16\n招商银行交易流水\nTransaction Statement of China Merchants Bank\n2024-09-06 -- 2025-09-06\n户  名：XXX\nName\n账户类型：ALL/全币种\nAccount Type\n申请时间：2025-09-08 19:15:51\nDate\n账号：65\nAccount No\n开 户 行：支行\nSub Branch\n验 证 码：111\nVerification Code\n记账日期货币交易金额联机余额交易摘要对手信息\nDateCurrency\nTransaction\nAmount\nBalanceTransaction TypeCounter Party\n2024-09-15CNY-50.00760.81快捷支付岭南通 123\n',
-  output: {
-    channel: '招商银行储蓄卡',
-    date: ['2024-09-06 00:00:00', '2025-09-06 23:59:59'],
-    data: [
-      {
-        余额: '0.00',
-        交易摘要: '朝朝宝转出',
-        对手信息: '',
-        交易日期: '2025-09-06',
-        交易金额: '50.05',
-        货币: 'CNY',
-      },
-    ],
-  },
-};
+// Demo数据已移至测试用例中
 type Args = FunctionArgs<{ input: string }>;
 type Output = ChannelProcessOutput<CmbDebitCardPayment>;
 
@@ -177,16 +160,5 @@ async function main({ params }: Args): Promise<Output> {
   };
 }
 
-// 测试函数
-async function testCmbDebitCardProcess() {
-  console.log('=== 招商银行储蓄卡数据处理测试 ===');
-  const result = await main({ params: demo });
-  console.log('处理结果:');
-  console.log(JSON.stringify(result, null, 2));
-  console.log('\n渠道:', result.output.channel);
-  console.log('日期范围:', result.output.date);
-  console.log('数据条数:', result.output.data.length);
-}
+export default main;
 
-// 取消注释下面的行来运行测试
-// testCmbDebitCardProcess().catch(console.error);

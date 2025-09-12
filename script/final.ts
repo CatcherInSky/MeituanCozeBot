@@ -12,66 +12,7 @@ import {
   getPaymentTime,
 } from '../types';
 
-const demo = {
-  meituan: [
-    {
-      交易创建时间: '2025-09-08 15:53:25',
-      交易成功时间: '2025-09-08 15:53:25',
-      订单金额: '¥70.56',
-      实付金额: '¥70.56',
-      订单标题: '朴朴商品订单',
-      备注: '/',
-      交易单号: '420000',
-      商家单号: '040',
-      交易类型: '商户消费',
-      '收/支': '支出',
-      支付方式: '招商银行储蓄卡()',
-    },
-  ],
-  input: {
-    Group1: {
-      channel: '微信支付' as PaymentChannel,
-      date: ['2025-06-08 00:00:00', '2025-09-08 23:59:59'] as [string, string],
-      data: [
-        {
-          交易时间: '2025-09-08 15:53:25',
-          '金额(元)': '¥70.56',
-          支付方式: '招商银行储蓄卡()',
-          商户单号: '040',
-          备注: '/',
-          当前状态: '支付成功',
-          交易类型: '商户消费',
-          交易对方: '朴朴超市',
-          商品: '朴朴商品订单',
-          '收/支': '支出',
-          交易单号: '420000',
-          数据来源: '微信支付',
-        },
-      ] as PaymentData[],
-    },
-    Group2: {
-      channel: '招商银行储蓄卡' as PaymentChannel,
-      date: ['2024-09-06 00:00:00', '2025-09-06 23:59:59'] as [string, string],
-      data: [
-        {
-          记账日期: '2024-09-15',
-          货币: 'CNY',
-          交易金额: '-50.00',
-          联机余额: '760.81',
-          交易摘要: '快捷支付岭南通',
-          对手信息: '123',
-          数据来源: '招商银行储蓄卡',
-        },
-      ] as PaymentData[],
-    },
-  } as AggregatedChannelData,
-  output: {
-    multichannel: [],
-    match: [],
-    unmatch: [],
-    uncover: [],
-  },
-};
+// Demo数据已移至测试用例中
 
 type Args = FunctionArgs<{ input: AggregatedChannelData; meituan: MeituanOrder[] }>;
 type Output = {
@@ -278,18 +219,5 @@ async function main({ params }: Args): Promise<Output> {
   };
 }
 
-// 测试函数
-async function testFinal() {
-  console.log('=== 美团订单与支付渠道数据匹配测试 ===');
-  const result = await main({ params: demo });
-  console.log('处理结果:');
-  console.log('multichannel数据条数:', result.output.multichannel.length);
-  console.log('match匹配对数:', result.output.match.length);
-  console.log('unmatch未匹配条数:', result.output.unmatch.length);
-  console.log('uncover未覆盖条数:', result.output.uncover.length);
-  console.log('\n详细结果:');
-  console.log(JSON.stringify(result, null, 2));
-}
+export default main;
 
-// 取消注释下面的行来运行测试
-// testFinal().catch(console.error);

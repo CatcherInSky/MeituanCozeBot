@@ -12,7 +12,7 @@ type Output = UrlBranchOutput;
  * @param url 文件URL
  * @returns 解码后的文件名
  */
-function extractFileName(url: string): string {
+export function extractFileName(url: string): string {
   try {
     const urlObj = new URL(url);
     const fileName = urlObj.searchParams.get('x-wf-file_name');
@@ -31,7 +31,7 @@ function extractFileName(url: string): string {
  * @param fileName 文件名
  * @returns 支付渠道类型
  */
-function detectPaymentChannel(fileName: string): PaymentChannel | '' {
+export function detectPaymentChannel(fileName: string): PaymentChannel | '' {
   if (!fileName) return ''; // 默认返回
 
   const lowerFileName = fileName.toLowerCase();
@@ -89,3 +89,5 @@ async function main({ params }: Args): Promise<Output> {
     };
   }
 }
+
+export default main;
