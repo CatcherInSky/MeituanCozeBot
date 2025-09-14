@@ -2,17 +2,22 @@
  * 根据文件URL判断支付渠道
  * 通过解析URL中的x-wf-file_name参数，根据文件名特征判断支付渠道类型
  */
-import { PaymentChannel, UrlBranchOutput, FunctionArgs } from '../types';
+import { 
+  // PaymentChannel, 
+  UrlBranchOutput, FunctionArgs } from '../types';
 
 type Args = FunctionArgs<{ input: string }>;
 type Output = UrlBranchOutput;
 
+
+
+ type PaymentChannel = '微信支付' | '招商银行储蓄卡' | '招商银行信用卡' | '支付宝' | '广发银行信用卡';
 /**
  * 从URL中提取文件名
  * @param url 文件URL
  * @returns 解码后的文件名
  */
-export function extractFileName(url: string): string {
+ function extractFileName(url: string): string {
   try {
     const urlObj = new URL(url);
     const fileName = urlObj.searchParams.get('x-wf-file_name');
@@ -31,30 +36,29 @@ export function extractFileName(url: string): string {
  * @param fileName 文件名
  * @returns 支付渠道类型
  */
-export function detectPaymentChannel(fileName: string): PaymentChannel | '' {
+ function detectPaymentChannel(fileName: string): PaymentChannel | '' {
   if (!fileName) return ''; // 默认返回
 
   const lowerFileName = fileName.toLowerCase();
 
   // 微信支付：文件名包含"微信支付"
-  if (lowerFileName.includes('微信支付') || lowerFileName.includes('wechat')) {
+  if (lowerFileName.includes('微信支付')) {
     return '微信支付';
   }
 
   // 支付宝：文件名包含"支付宝"或"alipay"
-  if (lowerFileName.includes('支付宝') || lowerFileName.includes('alipay')) {
+  if (lowerFileName.includes('支付宝')) {
     return '支付宝';
   }
 
   // 招商银行储蓄卡：文件名包含"招商银行交易流水"
-  if (lowerFileName.includes('招商银行交易流水')) {
+  if (lowerFileName.includes('招商银行')) {
     return '招商银行储蓄卡';
   }
 
   // 招商银行信用卡：文件名包含"信用卡账单"或"信用卡"且包含年月格式
   if (
-    lowerFileName.includes('信用卡账单') ||
-    (lowerFileName.includes('信用卡') && /\d{4}年\d{1,2}月/.test(fileName))
+    lowerFileName.includes('信用卡账单')
   ) {
     return '招商银行信用卡';
   }
@@ -62,8 +66,8 @@ export function detectPaymentChannel(fileName: string): PaymentChannel | '' {
   // todo 新增
 
   // 其他招商银行相关文件，默认为储蓄卡
-  if (lowerFileName.includes('招商银行')) {
-    return '招商银行储蓄卡';
+  if (lowerFileName.includes('综合对账单打印版')) {
+    return '广发银行信用卡';
   }
 
   return ''; // 默认返回

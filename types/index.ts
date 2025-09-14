@@ -79,11 +79,11 @@ export interface AlipayPayment {
   交易单号: string;
   数据来源: string;
 }
-
+// todo 新增枚举
 /**
  * 支付渠道类型枚举
  */
-export type PaymentChannel = '微信支付' | '招商银行储蓄卡' | '招商银行信用卡' | '支付宝';
+export type PaymentChannel = '微信支付' | '招商银行储蓄卡' | '招商银行信用卡' | '支付宝' | '广发银行信用卡';
 
 /**
  * 统一支付数据格式（所有渠道数据的联合类型）
