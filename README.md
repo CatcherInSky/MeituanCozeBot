@@ -21,6 +21,18 @@ MeituanCozeBot/
     └── url_branch.ts  # URL分支检测
 
 ```
+# 代码节点开发规范
+## JavaScript
+- 支持 V8 引擎的 11.3.244.8 版本（对应 Node.js 20.3.1 版本），并兼容 ECMAScript 2022 语法。
+- 在 JavaScript 中，仅内置了两个三方依赖库：dayjs（版本 1.8.36）lodash（版本 4.17.20） 。
+- JavaScript 运行时遵循 WinterCG 规范，并支持一系列 Web API，包括：atob()、btoa()、console、setTimeout()、clearTimeout()、structuredClone()、URL、URLSearchParams、AbortController、AbortSignal、TextEncoder、TextDecoder、WebStreams、WebCrypto（算法仅支持 AES、HMAC、SHA）
+## Python
+- 基于 Python 3.11.3 的标准库，大多数模块都能正常运行。不支持的模块包括 curses、dbm、ensurepip、fcntl、grp、idlelib、lib2to3、msvcrt、pwd、resource、syslog、termios、tkinter、turtle.py、turtledemo、venv、winreg、winsound、multiprocessing、threading、sockets、pty 和 tty。
+- 在 Python 环境中，仅内置了两个第三方依赖库：requests_async 和 numpy。其中，requests_async 与 requests 类似，但在使用时需要搭配 await
+- Python 运行时暂不支持 Http.client 方式的请求。
+- 不支持使用除 requests_async 、numpy 以外的第三方依赖库。
+- time.sleep() 方法由于是阻塞调用，会对代码执行性能产生影响，因此推荐使用异步版本的 asyncio.sleep() 来替代。
+
 
 # 数据流向
 meituan_filelist_process -> meituan_markdown_generator
