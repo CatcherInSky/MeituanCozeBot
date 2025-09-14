@@ -1,23 +1,12 @@
 // 根据final.ts的uncover输出，生成markdown组件使用的字符串
 import { 
-  // MeituanOrder,
-   MarkdownGeneratorInput, MarkdownGeneratorOutput } from '../../types';
+  MeituanOrder,
+  MarkdownGeneratorInput, 
+  MarkdownGeneratorOutput 
+} from '../../types';
 
 type Args = MarkdownGeneratorInput;
 type Output = MarkdownGeneratorOutput;
-interface MeituanOrder {
-  支付方式: string;
-  实付金额: string;
-  备注: string;
-  订单标题: string;
-  交易创建时间: string;
-  交易成功时间: string;
-  交易类型: string;
-  '收/支': string;
-  订单金额: string;
-  交易单号: string;
-  商家单号: string;
-}
 /**
  * 根据换行类型获取换行符
  * @param newlineType 换行类型

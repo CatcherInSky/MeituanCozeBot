@@ -1,21 +1,36 @@
-import asyncio
+"""
+CSV文件解析器工具
+
+Each file needs to export a function named `handler`. This function is the entrance to the Tool.
+
+Parameters:
+args: parameters of the entry function.
+args.input - input parameters, you can get test input value by args.input.xxx.
+args.logger - logger instance used to print logs, injected by runtime.
+
+Remember to fill in input/output in Metadata , it helps LLM to recognize and use tool.
+
+Return:
+The return data of the function, which should match the declared output parameters.
+"""
+
 import json
 import csv
 import io
 from typing import List, Dict, Any, Optional
-import requests_async as requests
+import requests
 
 
-class AlipayCSVParser:
-    """支付宝CSV文件解析器 - Coze版本"""
+class CSVParser:
+    """CSV文件解析器"""
     
     def __init__(self):
         self.supported_encodings = ['gbk', 'gb2312', 'utf-8', 'utf-8-sig']
     
-    async def fetch_csv_from_url(self, url: str) -> str:
+    def fetch_csv_from_url(self, url: str) -> str:
         """从URL获取CSV文件内容"""
         try:
-            response = await requests.get(url, timeout=30)
+            response = requests.get(url, timeout=30)
             response.raise_for_status()
             content = response.content
             
@@ -35,42 +50,55 @@ class AlipayCSVParser:
                 continue
         return 'gbk'  # 默认使用GBK编码
     
-    def parse_csv_content(self, content: str) -> List[Dict[str, Any]]:
-        """解析CSV内容为JSON格式"""
+    def parse_csv_content(self, content: str) -> List[List[Any]]:
+        """解析CSV内容为数组格式"""
         try:
             # 按行分割内容
             lines = content.strip().split('\n')
             
             # 查找数据开始行（跳过头部信息）
             data_start_line = 0
-            for i, line in enumerate(lines):
-                if '交易时间' in line and '交易对方' in line:
-                    data_start_line = i
-                    break
+            # for i, line in enumerate(lines):
+            #     if '交易时间' in line and '交易对方' in line:
+            #         data_start_line = i
+            #         break
             
-            if data_start_line == 0:
-                raise Exception("未找到CSV数据表头")
+            # if data_start_line == 0:
+            #     raise Exception("未找到CSV数据表头")
             
-            # 解析表头
-            header_line = lines[data_start_line]
-            headers = [col.strip() for col in header_line.split(',')]
+            # 第一步：扫描所有行，找到最宽的列数
+            max_columns = 0
+            all_parsed_rows = []
             
-            # 解析数据行
-            data_rows = []
-            for line in lines[data_start_line + 1:]:
+            for line_num, line in enumerate(lines[data_start_line:], start=data_start_line + 1):
                 if not line.strip():
                     continue
                 
                 # 处理CSV行，考虑引号和逗号
                 row_data = self._parse_csv_line(line)
-                if len(row_data) >= len(headers):
-                    row_dict = {}
-                    for i, header in enumerate(headers):
-                        if i < len(row_data):
-                            row_dict[header] = row_data[i].strip()
-                        else:
-                            row_dict[header] = ""
-                    data_rows.append(row_dict)
+                all_parsed_rows.append((line_num, row_data))
+                
+                # 更新最大列数
+                if len(row_data) > max_columns:
+                    max_columns = len(row_data)
+            
+            print(f"扫描完成，最大列数: {max_columns}")
+            
+            # 第二步：标准化所有行，空值用null表示
+            data_rows = []
+            for line_num, row_data in all_parsed_rows:
+                # 标准化行数据，确保列数一致
+                standardized_row = []
+                for i in range(max_columns):
+                    if i < len(row_data) and row_data[i].strip():
+                        standardized_row.append(row_data[i].strip())
+                    else:
+                        standardized_row.append(None)  # 空值用null表示
+                
+                # 调试信息：打印每行的解析结果
+                print(f"第{line_num}行解析结果: 列数={len(standardized_row)}, 内容={standardized_row[:3]}...")  # 只显示前3列
+                
+                data_rows.append(standardized_row)
             
             return data_rows
             
@@ -106,13 +134,17 @@ class AlipayCSVParser:
         
         # 添加最后一个字段
         result.append(current_field)
+        
+        # 调试信息
+        print(f"解析行: '{line[:50]}...' -> {len(result)}个字段")
+        
         return result
     
-    async def process_alipay_csv(self, url: str) -> Dict[str, Any]:
-        """处理支付宝CSV文件的主要方法"""
+    def process_csv(self, url: str) -> Dict[str, Any]:
+        """处理CSV文件的主要方法"""
         try:
             # 获取CSV内容
-            content = await self.fetch_csv_from_url(url)
+            content = self.fetch_csv_from_url(url)
             
             # 解析CSV内容
             data_rows = self.parse_csv_content(content)
@@ -136,41 +168,43 @@ class AlipayCSVParser:
             }
 
 
-async def main(args) -> dict:
-    """主函数，用于Coze代码节点"""
-    # 按照demo格式获取URL: args.params['input']
+def handler(args) -> dict:
+    """主函数 - CSV文件解析器入口"""
+    # 获取URL参数
     try:
-        url = args.params['input']
+        url = args.input.input
         
         # 验证URL是否有效
         if not url or not isinstance(url, str) or not url.strip():
+            args.logger.info(args)
+            args.logger.error("解析失败: input参数为空或无效")
             return {
-                "output": json.dumps({"success": False, "error": "input参数为空或无效", "data": [], "total_records": 0}, ensure_ascii=False, indent=2),
+                "output": "",
                 "message": "解析失败: input参数为空或无效"
             }
             
     except (AttributeError, KeyError, TypeError) as e:
+        args.logger.error(f"解析失败: 参数解析失败 - {str(e)}")
         return {
-            "output": json.dumps({"success": False, "error": f"参数解析失败: {str(e)}", "data": [], "total_records": 0}, ensure_ascii=False, indent=2),
+            "output": "",
             "message": f"解析失败: 参数解析失败 - {str(e)}"
         }
     
-    parser = AlipayCSVParser()
-    result = await parser.process_alipay_csv(url)
+    args.logger.info(f"开始解析CSV文件: {url}")
+    
+    parser = CSVParser()
+    result = parser.process_csv(url)
     
     if result["success"]:
+        args.logger.info(f"成功解析{result['total_records']}条记录")
         return {
-            "output": json.dumps(result, ensure_ascii=False, indent=2),
+            "output": json.dumps(result['data']),
             "message": f"成功解析{result['total_records']}条记录"
         }
     else:
+        args.logger.error(f"解析失败: {result['error']}")
         return {
-            "output": json.dumps(result, ensure_ascii=False, indent=2),
+            "output": "",
             "message": f"解析失败: {result['error']}"
         }
 
-
-# Coze代码节点使用示例：
-# 在Coze工作流中，将此代码作为Python代码节点使用
-# 输入参数：args.params['input'] - input为CSV文件的URL
-# 输出格式：{output: string, message: string}

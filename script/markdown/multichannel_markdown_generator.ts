@@ -1,76 +1,12 @@
 // 根据final.ts的multichannel输出，生成markdown组件使用的字符串
 import { 
-  // PaymentData, 
-  MarkdownGeneratorInput, MarkdownGeneratorOutput } from '../../types';
+  PaymentData, 
+  MarkdownGeneratorInput, 
+  MarkdownGeneratorOutput 
+} from '../../types';
 
 type Args = MarkdownGeneratorInput;
 type Output = MarkdownGeneratorOutput;
-/**
- * 微信支付数据格式
- */
-interface WechatPayment {
-  交易时间: string;
-  '金额(元)': string;
-  支付方式: string;
-  商户单号: string;
-  备注: string;
-  当前状态: string;
-  交易类型: string;
-  交易对方: string;
-  商品: string;
-  '收/支': string;
-  交易单号: string;
-  数据来源: string;
-}
-
-/**
- * 招商银行储蓄卡数据格式
- */
-interface CmbDebitCardPayment {
-  记账日期: string;
-  货币: string;
-  交易金额: string;
-  联机余额: string;
-  交易摘要: string;
-  对手信息: string;
-  数据来源: string;
-}
-
-/**
- * 招商银行信用卡数据格式（假设）
- */
-interface CmbCreditCardPayment {
-  记账日期: string;
-  货币: string;
-  交易金额: string;
-  联机余额: string;
-  交易摘要: string;
-  对手信息: string;
-  数据来源: string;
-}
-
-/**
- * 支付宝数据格式（假设）
- */
-interface AlipayPayment {
-  交易时间: string;
-  '金额(元)': string;
-  支付方式: string;
-  商户单号: string;
-  备注: string;
-  当前状态: string;
-  交易类型: string;
-  交易对方: string;
-  商品: string;
-  '收/支': string;
-  交易单号: string;
-  数据来源: string;
-}
-type PaymentData =
-  | WechatPayment
-  | CmbDebitCardPayment
-  | CmbCreditCardPayment
-  | AlipayPayment;
 /**
  * 根据换行类型获取换行符
  * @param newlineType 换行类型

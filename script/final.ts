@@ -1,17 +1,16 @@
 // 美团订单与支付渠道数据匹配处理
 import {
-  // MeituanOrder,
-  // PaymentData,
+  MeituanOrder,
+  PaymentData,
+  MatchResult,
   AggregatedChannelData,
   FinalOutput,
   FunctionArgs,
-  // ChannelDataGroup,
-  // MatchResult,
-  // PaymentChannel,
-  // WechatPayment,
-  // CmbDebitCardPayment,
-  // CmbCreditCardPayment,
-  // AlipayPayment,
+  ChannelDataGroup,
+  WechatPayment,
+  CmbDebitCardPayment,
+  CmbCreditCardPayment,
+  AlipayPayment,
 } from '../types';
 
 // Demo数据已移至测试用例中
@@ -22,98 +21,6 @@ type Output = {
 };
 
 
-type MatchResult = {
-  '美团': MeituanOrder;
-  [key: string]: MeituanOrder | PaymentData;
-};
-
-interface MeituanOrder {
-  支付方式: string;
-  实付金额: string;
-  备注: string;
-  订单标题: string;
-  交易创建时间: string;
-  交易成功时间: string;
-  交易类型: string;
-  '收/支': string;
-  订单金额: string;
-  交易单号: string;
-  商家单号: string;
-}
- interface WechatPayment {
-  交易时间: string;
-  '金额(元)': string;
-  支付方式: string;
-  商户单号: string;
-  备注: string;
-  当前状态: string;
-  交易类型: string;
-  交易对方: string;
-  商品: string;
-  '收/支': string;
-  交易单号: string;
-  数据来源: string;
-}
-
-/**
- * 招商银行储蓄卡数据格式
- */
- interface CmbDebitCardPayment {
-  记账日期: string;
-  货币: string;
-  交易金额: string;
-  联机余额: string;
-  交易摘要: string;
-  对手信息: string;
-  数据来源: string;
-}
-
-/**
- * 招商银行信用卡数据格式（假设）
- */
- interface CmbCreditCardPayment {
-  记账日期: string;
-  货币: string;
-  交易金额: string;
-  联机余额: string;
-  交易摘要: string;
-  对手信息: string;
-  数据来源: string;
-}
-
-/**
- * 支付宝数据格式（假设）
- */
- interface AlipayPayment {
-  交易时间: string;
-  '金额(元)': string;
-  支付方式: string;
-  商户单号: string;
-  备注: string;
-  当前状态: string;
-  交易类型: string;
-  交易对方: string;
-  商品: string;
-  '收/支': string;
-  交易单号: string;
-  数据来源: string;
-}
-
-
-type PaymentData =
-  | WechatPayment
-  | CmbDebitCardPayment
-  | CmbCreditCardPayment
-  | AlipayPayment;
-
-   interface ChannelDataGroup {
-    channel: PaymentChannel;
-    date: [string, string]; // [开始时间, 结束时间]
-    data: PaymentData[];
-  }
-  
-
-  type PaymentChannel = '微信支付' | '招商银行储蓄卡' | '招商银行信用卡' | '支付宝';
 
 
 /**
