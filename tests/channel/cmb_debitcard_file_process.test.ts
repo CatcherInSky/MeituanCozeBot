@@ -99,7 +99,7 @@ describe('cmb_debitcard_file_process.ts - 招商银行储蓄卡数据处理', ()
     const result = await main({ params: { input: multiLineInput } });
 
     expect(result.output.data.length).toBeGreaterThan(0);
-    result.output.data.forEach(transaction => {
+    result.output.data.forEach((transaction: any) => {
       expect(transaction.对手信息).toBeDefined();
     });
   });

@@ -112,11 +112,11 @@
   },
   "include": [
     "script/**/*",
-    "types/**/*"
+    "types/**/*",
+    "tests/**/*"
   ],
   "exclude": [
     "node_modules",
-    "dist/**/*",
-    "tests/**/*"
+    "dist/**/*"
   ]
 }

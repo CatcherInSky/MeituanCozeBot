@@ -94,4 +94,5 @@ async function main({ params }: Args): Promise<Output> {
   }
 }
 
+export { extractFileName, detectPaymentChannel };
 export default main;

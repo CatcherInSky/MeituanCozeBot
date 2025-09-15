@@ -122,7 +122,7 @@ describe('match_markdown_generator.ts - 已匹配订单数据Markdown生成', ()
     expect(result.output).toBeDefined();
     // 检查排序是否正确（较新的时间在前）
     const lines = result.output.split('\u000A');
-    const dataLines = lines.filter(line => line.includes('2025-01-'));
+    const dataLines = lines.filter((line: string) => line.includes('2025-01-'));
     expect(dataLines[0]).toContain('2025-01-02');
     expect(dataLines[1]).toContain('2025-01-01');
   });

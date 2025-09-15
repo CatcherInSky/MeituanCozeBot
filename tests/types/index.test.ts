@@ -8,6 +8,7 @@ import {
   getPaymentTime,
 } from '../../script/final';
 import { wechatTestData, cmbDebitCardTestData } from '../testData';
+import { PaymentData } from '../../types';
 
 describe('script/final.ts - 类型守卫和工具函数', () => {
   describe('类型守卫函数', () => {
@@ -92,13 +93,13 @@ describe('script/final.ts - 类型守卫和工具函数', () => {
 
   describe('类型安全测试', () => {
     test('类型守卫应该提供类型收窄', () => {
-      const paymentData = wechatTestData[0];
+      const paymentData: PaymentData = wechatTestData[0];
 
       if (isWechatPayment(paymentData)) {
         // 在这个块中，TypeScript应该知道paymentData是WechatPayment类型
         expect(paymentData.交易时间).toBeDefined();
         expect(paymentData['金额(元)']).toBeDefined();
-        // @ts-expect-error - 这些字段不应该存在于WechatPayment中
+        // 这些字段不应该存在于WechatPayment中
         // expect(paymentData.记账日期).toBeDefined();
       }
 

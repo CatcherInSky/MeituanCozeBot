@@ -75,7 +75,7 @@ describe('uncover_markdown_generator.ts - 未覆盖订单数据Markdown生成', 
     expect(result.output).toBeDefined();
     // 检查排序是否正确（较新的时间在前）
     const lines = result.output.split('\u000A');
-    const dataLines = lines.filter(line => line.includes('2025-01-'));
+    const dataLines = lines.filter((line: string) => line.includes('2025-01-'));
     expect(dataLines[0]).toContain('2025-01-02');
     expect(dataLines[1]).toContain('2025-01-01');
   });
@@ -137,7 +137,7 @@ describe('uncover_markdown_generator.ts - 未覆盖订单数据Markdown生成', 
     expect(result.output).toContain('## 招商银行储蓄卡()');
     // 应该包含两个订单
     const lines = result.output.split('\u000A');
-    const dataLines = lines.filter(line => line.includes('420000') || line.includes('different'));
+    const dataLines = lines.filter((line: string) => line.includes('420000') || line.includes('different'));
     expect(dataLines).toHaveLength(2);
   });
 

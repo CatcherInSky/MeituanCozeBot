@@ -32,7 +32,7 @@ describe('meituan_filelist_process.ts - 美团订单数据处理', () => {
     const result = await main({ params: { input: meituanRawInputData } });
 
     // 所有结果都应该是退款类型
-    result.output.forEach(order => {
+    result.output.forEach((order: any) => {
       expect(order.交易类型).toBe('退款');
     });
   });
@@ -74,7 +74,7 @@ describe('meituan_filelist_process.ts - 美团订单数据处理', () => {
 
     const result = await main({ params: { input: duplicateInput } });
 
-    const transactionIds = result.output.map(order => order.交易单号);
+    const transactionIds = result.output.map((order: any) => order.交易单号);
     const uniqueIds = new Set(transactionIds);
     expect(transactionIds.length).toBe(uniqueIds.size);
   });

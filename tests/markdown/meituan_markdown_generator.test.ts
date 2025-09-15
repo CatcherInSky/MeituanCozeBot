@@ -7,7 +7,6 @@ describe('meituan_markdown_generator.ts - 美团退款数据Markdown生成', () 
     const result = await main({ 
       params: { 
         input: meituanTestData,
-        newlineType: 'natural'
       } 
     });
 
@@ -20,7 +19,6 @@ describe('meituan_markdown_generator.ts - 美团退款数据Markdown生成', () 
     const result = await main({ 
       params: { 
         input: meituanTestData,
-        newlineType: 'natural'
       } 
     });
 
@@ -31,7 +29,6 @@ describe('meituan_markdown_generator.ts - 美团退款数据Markdown生成', () 
     const result = await main({ 
       params: { 
         input: meituanTestData,
-        newlineType: 'natural'
       } 
     });
 
@@ -43,7 +40,6 @@ describe('meituan_markdown_generator.ts - 美团退款数据Markdown生成', () 
     const result = await main({ 
       params: { 
         input: meituanTestData,
-        newlineType: 'natural'
       } 
     });
 
@@ -61,7 +57,6 @@ describe('meituan_markdown_generator.ts - 美团退款数据Markdown生成', () 
       const result = await main({ 
         params: { 
           input: meituanTestData,
-          newlineType
         } 
       });
 
@@ -74,7 +69,6 @@ describe('meituan_markdown_generator.ts - 美团退款数据Markdown生成', () 
     const result = await main({ 
       params: { 
         input: [],
-        newlineType: 'natural'
       } 
     });
 
@@ -92,7 +86,6 @@ describe('meituan_markdown_generator.ts - 美团退款数据Markdown生成', () 
     const result = await main({ 
       params: { 
         input: specialData,
-        newlineType: 'natural'
       } 
     });
 
@@ -122,7 +115,6 @@ describe('meituan_markdown_generator.ts - 美团退款数据Markdown生成', () 
     const result = await main({ 
       params: { 
         input: unsortedData,
-        newlineType: 'natural'
       } 
     });
 
@@ -147,7 +139,6 @@ describe('meituan_markdown_generator.ts - 美团退款数据Markdown生成', () 
     const result = await main({ 
       params: { 
         input: dataWithNulls,
-        newlineType: 'natural'
       } 
     });
 

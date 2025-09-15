@@ -50,33 +50,46 @@ export interface CmbDebitCardPayment {
 }
 
 /**
- * 招商银行信用卡数据格式（假设）
+ * 招商银行信用卡数据格式
  */
 export interface CmbCreditCardPayment {
-  记账日期: string;
-  货币: string;
-  交易金额: string;
-  联机余额: string;
+  交易日: string;
+  记账日: string;
   交易摘要: string;
-  对手信息: string;
+  人民币金额: string;
+  卡号末四位: string;
+  交易地金额: string;
+  数据来源: string;
+  类型: string;
+}
+
+export interface GfCreditCardPayment {
+  交易日期: string;
+  入账日期: string;
+  交易摘要: string;
+  交易金额: string;
+  交易货币: string;
+  入账金额: string;
+  入账货币: string;
   数据来源: string;
 }
 
 /**
- * 支付宝数据格式（假设）
+ * 支付宝数据格式
  */
 export interface AlipayPayment {
   交易时间: string;
-  '金额(元)': string;
-  支付方式: string;
-  商户单号: string;
-  备注: string;
-  当前状态: string;
-  交易类型: string;
+  交易分类: string;
   交易对方: string;
-  商品: string;
+  对方账号: string;
+  商品说明: string;
   '收/支': string;
-  交易单号: string;
+  金额: string;
+  '收/付款方式': string;
+  交易状态: string;
+  交易订单号: string;
+  商家订单号: string;
+  备注: string;
   数据来源: string;
 }
 // todo 新增枚举
@@ -92,7 +105,8 @@ export type PaymentData =
   | WechatPayment
   | CmbDebitCardPayment
   | CmbCreditCardPayment
-  | AlipayPayment;
+  | AlipayPayment
+  | GfCreditCardPayment;
 
 /**
  * 渠道数据组（包含渠道信息和数据）

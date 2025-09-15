@@ -1,108 +1,389 @@
-// 测试数据集合
+// 测试数据集合 - 基于demo数据但已脱敏处理
+// 
+// 数据解析规律和测试方案：
+// 
+// 1. 【名称解析规则】
+//    - 美团、微信、支付宝：直接在文件名中识别
+//    - 招商银行储蓄卡：文件名包含"招商银行交易流水"
+//    - 招商银行信用卡：文件名格式为"X年X月信用卡账单"
+//    - 广发银行信用卡：文件名格式为"X年X月综合对账单打印版"
+//
+// 2. 【美团数据解析】CSV格式
+//    - 解析起点：【美团交易账单明细列表】
+//    - 日期解析：起始时间：[YYYY-MM-DD] 终止时间：[YYYY-MM-DD]
+//    - 数据结构：表头+数据行，JSON格式嵌套
+//
+// 3. 【招商银行储蓄卡解析】PDF格式
+//    - 解析起点：验证码(Verification Code)之后
+//    - 日期解析：Transaction Statement of China Merchants Bank下一行，格式YYYY-MM-DD -- YYYY-MM-DD
+//    - 数据特点：一行数据拼接，需特殊分隔规则
+//      * 日期：YYYY-MM-DD格式
+//      * 货币：英文缩写(CNY)
+//      * 金额：两位小数格式
+//      * 交易摘要和对手信息：可能包含换行符，难以区分
+//    - 时间补全：开始日期+00:00:00，结束日期+23:59:59
+//
+// 4. 【微信数据解析】XLSX格式
+//    - 日期解析：起始时间：[YYYY-MM-DD HH:mm:ss] 终止时间：[YYYY-MM-DD HH:mm:ss]
+//    - 解析起点：----------------------微信支付账单明细列表--------------------
+//    - 数据结构：标准表格格式，包含表头和数据行
+//
+// 5. 【支付宝数据解析】CSV格式
+//    - 日期解析：起始时间：[YYYY-MM-DD HH:mm:ss]    终止时间：[YYYY-MM-DD HH:mm:ss]（注意多个空格）
+//    - 解析起点：------------------------支付宝（中国）网络技术有限公司  电子客户回单------------------------
+//    - 数据结构：表头在分隔线下一行，数据紧随其后
+//
+// 6. 【招商银行信用卡解析】PDF格式
+//    - 日期计算：终止日期=账单日下一行，开始日期=终止日期往前推一个月
+//    - 解析范围：人民币账户 RMB A/C 下一行开始，本期还款总额上一行结束
+//    - 数据特点：一行拼接格式
+//      * 交易日/记账日：MM/DD格式
+//      * 金额：两位小数，可能包含(CN)标识
+//      * 交易类型：另起一行标识（\n 还款、\n 退款、\n 消费等）
+//
+// 7. 【广发银行信用卡解析】PDF格式
+//    - 日期解析：账单周期YYYY/MM/DD - YYYY/MM/DD
+//    - 解析范围：注：若您名下的多张信用卡主卡均有欠款，需分别还款 下一行开始
+//                用卡安全温馨提示： 上一行结束
+//    - 数据特点：一行拼接，日期YYYY/MM/DD格式，金额两位小数
+//
+// 8. 【信用卡金额规则】
+//    - 正负符号含义可能因银行而异
+//    - 招商银行：负数表示退款，正数表示消费
+//    - 广发银行：负数表示退货/还款，正数表示消费
+//
+// 9. 【美团退款匹配规则】
+//    - 强规则（必须满足）：
+//      * 金额精确匹配
+//      * 时间在误差范围内（±2小时）
+//    - 弱规则（辅助判断）：
+//      * 交易摘要包含"美团"关键词
+//      * 交易类型包含"退款"关键词
+//      * 支付方式匹配
+
 import { MeituanOrder, PaymentData, AggregatedChannelData, PaymentChannel } from '../types';
 
-// 美团订单测试数据
+// 美团订单测试数据 - 基于demo/美团.json脱敏后的数据
 export const meituanTestData: MeituanOrder[] = [
+  // 退款订单 - 招商银行信用卡
   {
-    交易创建时间: '2025-09-08 15:53:25',
-    交易成功时间: '2025-09-08 15:53:25',
-    订单金额: '¥70.56',
-    实付金额: '¥70.56',
-    订单标题: '朴朴商品订单',
+    交易创建时间: '2025-06-18 06:17:21',
+    交易成功时间: '2025-06-18 06:17:23',
+    订单金额: '¥2.66',
+    实付金额: '¥2.66',
+    订单标题: '【甄选爆款】11选1',
     备注: '/',
-    交易单号: '420000',
-    商家单号: '040',
-    交易类型: '商户消费',
-    '收/支': '支出',
-    支付方式: '招商银行储蓄卡()',
+    交易单号: 'TEST001001001001001',
+    商家单号: 'MERCHANT001001001001',
+    交易类型: '退款',
+    '收/支': '收入',
+    支付方式: '招商银行信用卡(1234)',
   },
+  // 退款订单 - 微信支付
   {
-    交易创建时间: '2025-06-02 15:08:21',
-    交易成功时间: '2025-06-02 15:08:27',
-    订单金额: '¥16.00',
-    实付金额: '¥16.00',
-    订单标题: '茉莉奶白 订单详情',
+    交易创建时间: '2025-07-15 17:13:46',
+    交易成功时间: '2025-07-15 17:13:56',
+    订单金额: '¥0.18',
+    实付金额: '¥0.18',
+    订单标题: '小象超市-订单编号TEST002002',
     备注: '/',
-    交易单号: '123',
-    商家单号: '123',
-    交易类型: '支付',
-    '收/支': '支出',
-    支付方式: '招商银行信用卡()',
+    交易单号: 'TEST002002002002002',
+    商家单号: 'TEST002002-MERCHANT002',
+    交易类型: '退款',
+    '收/支': '收入',
+    支付方式: '微信支付',
+  },
+  // 退款订单 - 招商银行储蓄卡（用于测试uncover场景）
+  {
+    交易创建时间: '2025-08-01 06:29:41',
+    交易成功时间: '2025-08-01 06:29:41',
+    订单金额: '¥8.57',
+    实付金额: '¥8.57',
+    订单标题: '【9.9喝咖啡】美式咖啡/拿铁咖啡2选1',
+    备注: '/',
+    交易单号: 'TEST003003003003003',
+    商家单号: 'MERCHANT003003003003',
+    交易类型: '退款',
+    '收/支': '收入',
+    支付方式: '招商银行储蓄卡(5678)',
   },
 ];
 
-// 微信支付测试数据
+// 微信支付测试数据 - 基于demo/微信支付.json脱敏后的数据
 export const wechatTestData: PaymentData[] = [
+  // 商户消费 - 朴朴超市
   {
     交易时间: '2025-09-08 15:53:25',
     '金额(元)': '¥70.56',
-    支付方式: '招商银行储蓄卡()',
-    商户单号: '040',
+    支付方式: '招商银行储蓄卡(1234)',
+    商户单号: 'TEST001001001001PAY01',
     备注: '/',
     当前状态: '支付成功',
     交易类型: '商户消费',
     交易对方: '朴朴超市',
     商品: '朴朴商品订单',
     '收/支': '支出',
-    交易单号: '420000',
+    交易单号: 'WX001001001001001001001',
+    数据来源: '微信支付',
+  },
+  // 扫二维码付款
+  {
+    交易时间: '2025-09-06 20:12:28',
+    '金额(元)': '¥16.00',
+    支付方式: '招商银行储蓄卡(1234)',
+    商户单号: 'TEST002002002002002',
+    备注: '/',
+    当前状态: '已转账',
+    交易类型: '扫二维码付款',
+    交易对方: '清润坊甜品',
+    商品: '收款方备注:二维码收款',
+    '收/支': '支出',
+    交易单号: 'WX002002002002002002002',
+    数据来源: '微信支付',
+  },
+  // 美团退款
+  {
+    交易时间: '2025-07-15 17:13:51',
+    '金额(元)': '¥0.18',
+    支付方式: '招商银行信用卡(1234)',
+    商户单号: '',
+    备注: '/',
+    当前状态: '已退款￥0.18',
+    交易类型: '美团-退款',
+    交易对方: '美团',
+    商品: '美团',
+    '收/支': '收入',
+    交易单号: 'WX003003003003003003003',
     数据来源: '微信支付',
   },
 ];
 
-// 招商银行储蓄卡测试数据
+// 招商银行储蓄卡测试数据 - 基于demo/招商银行储蓄卡.json脱敏后的数据
 export const cmbDebitCardTestData: PaymentData[] = [
+  // 快捷支付岭南通
   {
     记账日期: '2024-09-15',
     货币: 'CNY',
     交易金额: '-50.00',
-    联机余额: '760.81',
+    联机余额: '12345.67',
     交易摘要: '快捷支付岭南通',
-    对手信息: '123',
+    对手信息: 'TEST001001001',
+    数据来源: '招商银行储蓄卡',
+  },
+  // 快捷支付扫二维码付款
+  {
+    记账日期: '2024-09-15',
+    货币: 'CNY',
+    交易金额: '-28.00',
+    联机余额: '12317.67',
+    交易摘要: '快捷支付扫二维码付款',
+    对手信息: 'TEST002002002',
+    数据来源: '招商银行储蓄卡',
+  },
+  // 快捷支付微信转账
+  {
+    记账日期: '2025-09-08',
+    货币: 'CNY',
+    交易金额: '-70.56',
+    联机余额: '12247.11',
+    交易摘要: '快捷支付微信转账',
+    对手信息: 'TEST003003003',
     数据来源: '招商银行储蓄卡',
   },
 ];
 
-// 聚合渠道测试数据
-export const aggregatedChannelTestData: AggregatedChannelData = {
-  Group1: {
-    channel: '微信支付' as PaymentChannel,
-    date: ['2025-06-08 00:00:00', '2025-09-08 23:59:59'] as [string, string],
-    data: wechatTestData,
+// 招商银行信用卡测试数据 - 基于demo/招商银行信用卡.json脱敏后的数据
+export const cmbCreditCardTestData: PaymentData[] = [
+  // 美团支付-美团App库迪咖啡 退款
+  {
+    交易日: '06/18',
+    记账日: '06/19',
+    交易摘要: '美团支付-美团App库迪咖啡',
+    人民币金额: '-2.66',
+    卡号末四位: '1234',
+    交易地金额: '-2.66(CN)',
+    类型: '退款',
+    数据来源: '招商银行信用卡',
   },
-  Group2: {
-    channel: '招商银行储蓄卡' as PaymentChannel,
-    date: ['2024-09-06 00:00:00', '2025-09-06 23:59:59'] as [string, string],
-    data: cmbDebitCardTestData,
+  // 财付通-美团 退款
+  {
+    交易日: '07/15',
+    记账日: '07/16',
+    交易摘要: '财付通-美团',
+    人民币金额: '-0.18',
+    卡号末四位: '1234',
+    交易地金额: '-0.18(CN)',
+    类型: '退款',
+    数据来源: '招商银行信用卡',
   },
-};
-
-// 美团原始输入数据（JSON字符串）
-export const meituanRawInputData = [
-  '[{"﻿美团交易账单明细":"美团用户名：[]"},{"﻿美团交易账单明细":"起始时间：[2025-03-08] 终止时间：[2025-06-08]"},{"﻿美团交易账单明细":"导出交易类型：[全部]"},{"﻿美团交易账单明细":"导出时间：[2025-09-08 12:09:25]"},{"﻿美团交易账单明细":""},{"﻿美团交易账单明细":"共：15笔记录"},{"﻿美团交易账单明细":"支出：10笔 192.46元"},{"﻿美团交易账单明细":"收入：5笔 53.62元"},{"﻿美团交易账单明细":"不计收支：0笔 0.00元"},{"﻿美团交易账单明细":""},{"﻿美团交易账单明细":"特别提示："},{"﻿美团交易账单明细":"1. 本明细与实际交易结果不符时，以实际交易情况为准"},{"﻿美团交易账单明细":"2. 本明细仅展示当前账单中的交易，不包括已删除的记录"},{"﻿美团交易账单明细":"3. 部分账单记录如充值/提现等交易，不计入为收入或支出类别"},{"﻿美团交易账单明细":"4. 因统计逻辑不同，明细的实付金额累加后可能与统计金额不一致，请以实际交易金额为准"},{"﻿美团交易账单明细":"5. 本明细仅供用户个人对账使用，不具备任何证明效力，禁止用于非法用途"},{"﻿美团交易账单明细":""},{"﻿美团交易账单明细":"【美团交易账单明细列表】"},{"﻿美团交易账单明细":"交易创建时间","null":["交易成功时间","交易类型","订单标题","收/支","支付方式","订单金额","实付金额","交易单号","商家单号","备注"]},{"﻿美团交易账单明细":"2025-06-02 15:08:21","null":["2025-06-02 15:08:27","支付","茉莉奶白 订单详情","支出","招商银行信用卡()","¥16.00","¥16.00","123\\t","123\\t","/"]}]',
+  // 美团支付-美团AppKOIThé 消费
+  {
+    交易日: '06/20',
+    记账日: '06/21',
+    交易摘要: '美团支付-美团AppKOIThé',
+    人民币金额: '20.80',
+    卡号末四位: '1234',
+    交易地金额: '20.80(CN)',
+    类型: '消费',
+    数据来源: '招商银行信用卡',
+  },
 ];
 
-// 微信支付原始输入数据（JSON字符串）
-export const wechatRawInputData = '[{"微信支付账单明细":"微信昵称：[--]","Unnamed: 1":null,"Unnamed: 2":null,"Unnamed: 3":null,"Unnamed: 4":null,"Unnamed: 5":null,"Unnamed: 6":null,"Unnamed: 7":null,"Unnamed: 8":null,"Unnamed: 9":null,"Unnamed: 10":null},{"微信支付账单明细":"起始时间：[2025-06-08 00:00:00] 终止时间：[2025-09-08 23:59:59]","Unnamed: 1":null,"Unnamed: 2":null,"Unnamed: 3":null,"Unnamed: 4":null,"Unnamed: 5":null,"Unnamed: 6":null,"Unnamed: 7":null,"Unnamed: 8":null,"Unnamed: 9":null,"Unnamed: 10":null},{"微信支付账单明细":"导出类型：[全部]","Unnamed: 1":null,"Unnamed: 2":null,"Unnamed: 3":null,"Unnamed: 4":null,"Unnamed: 5":null,"Unnamed: 6":null,"Unnamed: 7":null,"Unnamed: 8":null,"Unnamed: 9":null,"Unnamed: 10":null},{"微信支付账单明细":"导出时间：[2025-09-11 17:43:36]","Unnamed: 1":null,"Unnamed: 2":null,"Unnamed: 3":null,"Unnamed: 4":null,"Unnamed: 5":null,"Unnamed: 6":null,"Unnamed: 7":null,"Unnamed: 8":null,"Unnamed: 9":null,"Unnamed: 10":null},{"微信支付账单明细":null,"Unnamed: 1":null,"Unnamed: 2":null,"Unnamed: 3":null,"Unnamed: 4":null,"Unnamed: 5":null,"Unnamed: 6":null,"Unnamed: 7":null,"Unnamed: 8":null,"Unnamed: 9":null,"Unnamed: 10":null},{"微信支付账单明细":"共62笔记录","Unnamed: 1":null,"Unnamed: 2":null,"Unnamed: 3":null,"Unnamed: 4":null,"Unnamed: 5":null,"Unnamed: 6":null,"Unnamed: 7":null,"Unnamed: 8":null,"Unnamed: 9":null,"Unnamed: 10":null},{"微信支付账单明细":"收入：5笔 37元","Unnamed: 1":null,"Unnamed: 2":null,"Unnamed: 3":null,"Unnamed: 4":null,"Unnamed: 5":null,"Unnamed: 6":null,"Unnamed: 7":null,"Unnamed: 8":null,"Unnamed: 9":null,"Unnamed: 10":null},{"微信支付账单明细":"支出：57笔 1.82元","Unnamed: 1":null,"Unnamed: 2":null,"Unnamed: 3":null,"Unnamed: 4":null,"Unnamed: 5":null,"Unnamed: 6":null,"Unnamed: 7":null,"Unnamed: 8":null,"Unnamed: 9":null,"Unnamed: 10":null},{"微信支付账单明细":"中性交易：0笔 0.00元","Unnamed: 1":null,"Unnamed: 2":null,"Unnamed: 3":null,"Unnamed: 4":null,"Unnamed: 5":null,"Unnamed: 6":null,"Unnamed: 7":null,"Unnamed: 8":null,"Unnamed: 9":null,"Unnamed: 10":null},{"微信支付账单明细":"注：","Unnamed: 1":null,"Unnamed: 2":null,"Unnamed: 3":null,"Unnamed: 4":null,"Unnamed: 5":null,"Unnamed: 6":null,"Unnamed: 7":null,"Unnamed: 8":null,"Unnamed: 9":null,"Unnamed: 10":null},{"微信支付账单明细":"1. 充值\\/提现\\/理财通购买\\/零钱通存取\\/信用卡还款等交易，将计入中性交易","Unnamed: 1":null,"Unnamed: 2":null,"Unnamed: 3":null,"Unnamed: 4":null,"Unnamed: 5":null,"Unnamed: 6":null,"Unnamed: 7":null,"Unnamed: 8":null,"Unnamed: 9":null,"Unnamed: 10":null},{"微信支付账单明细":"2. 若交易记录明细无有效内容，则代表该时间段内此微信号无交易。","Unnamed: 1":null,"Unnamed: 2":null,"Unnamed: 3":null,"Unnamed: 4":null,"Unnamed: 5":null,"Unnamed: 6":null,"Unnamed: 7":null,"Unnamed: 8":null,"Unnamed: 9":null,"Unnamed: 10":null},{"微信支付账单明细":"3. 本明细仅供个人对账使用","Unnamed: 1":null,"Unnamed: 2":null,"Unnamed: 3":null,"Unnamed: 4":null,"Unnamed: 5":null,"Unnamed: 6":null,"Unnamed: 7":null,"Unnamed: 8":null,"Unnamed: 9":null,"Unnamed: 10":null},{"微信支付账单明细":null,"Unnamed: 1":null,"Unnamed: 2":null,"Unnamed: 3":null,"Unnamed: 4":null,"Unnamed: 5":null,"Unnamed: 6":null,"Unnamed: 7":null,"Unnamed: 8":null,"Unnamed: 9":null,"Unnamed: 10":null},{"微信支付账单明细":"----------------------微信支付账单明细列表--------------------","Unnamed: 1":null,"Unnamed: 2":null,"Unnamed: 3":null,"Unnamed: 4":null,"Unnamed: 5":null,"Unnamed: 6":null,"Unnamed: 7":null,"Unnamed: 8":null,"Unnamed: 9":null,"Unnamed: 10":null},{"微信支付账单明细":"交易时间","Unnamed: 1":"交易类型","Unnamed: 2":"交易对方","Unnamed: 3":"商品","Unnamed: 4":"收\\/支","Unnamed: 5":"金额(元)","Unnamed: 6":"支付方式","Unnamed: 7":"当前状态","Unnamed: 8":"交易单号","Unnamed: 9":"商户单号","Unnamed: 10":"备注"},{"微信支付账单明细":"2025-09-08 15:53:25","Unnamed: 1":"商户消费","Unnamed: 2":"朴朴超市","Unnamed: 3":"朴朴商品订单","Unnamed: 4":"支出","Unnamed: 5":"¥70.56","Unnamed: 6":"招商银行储蓄卡()","Unnamed: 7":"支付成功","Unnamed: 8":"123","Unnamed: 9":"123","Unnamed: 10":"\\/"}]';
+// 广发银行信用卡测试数据 - 基于demo/广发银行信用卡.json脱敏后的数据
+export const gfCreditCardTestData: PaymentData[] = [
+  // 美团消费
+  {
+    交易日期: '2024/02/24',
+    入账日期: '2024/02/25',
+    交易摘要: '（特约）美团',
+    交易金额: '46.00',
+    交易货币: '人民币',
+    入账金额: '46.00',
+    入账货币: '人民币',
+    数据来源: '广发银行信用卡',
+  },
+  // 美团退货
+  {
+    交易日期: '2024/02/22',
+    入账日期: '2024/02/23',
+    交易摘要: '（特约）美团',
+    交易金额: '-2.49',
+    交易货币: '人民币',
+    入账金额: '-2.49',
+    入账货币: '人民币',
+    数据来源: '广发银行信用卡',
+  },
+  // 财付通消费
+  {
+    交易日期: '2024/02/24',
+    入账日期: '2024/02/24',
+    交易摘要: '财付通-广州测试咖啡店有限公司',
+    交易金额: '36.00',
+    交易货币: '人民币',
+    入账金额: '36.00',
+    入账货币: '人民币',
+    数据来源: '广发银行信用卡',
+  },
+];
 
-// 招商银行储蓄卡原始输入数据（PDF文本）
-export const cmbDebitCardRawInputData = '\n\n1/16\n招商银行交易流水\nTransaction Statement of China Merchants Bank\n2024-09-06 -- 2025-09-06\n户  名：XXX\nName\n账户类型：ALL/全币种\nAccount Type\n申请时间：2025-09-08 19:15:51\nDate\n账号：65\nAccount No\n开 户 行：支行\nSub Branch\n验 证 码：111\nVerification Code\n记账日期货币交易金额联机余额交易摘要对手信息\nDateCurrency\nTransaction\nAmount\nBalanceTransaction TypeCounter Party\n2024-09-15CNY-50.00760.81快捷支付岭南通 123\n';
+// 支付宝测试数据 - 基于demo/支付宝.json脱敏后的数据
+export const alipayTestData: PaymentData[] = [
+  // 餐饮美食-广州盒马
+  {
+    交易时间: '2025-09-11 15:17:22',
+    交易分类: '餐饮美食',
+    交易对方: '广州盒马',
+    对方账号: 'test***@163.com',
+    商品说明: '3类商品',
+    '收/支': '支出',
+    金额: '36.06',
+    '收/付款方式': '民生银行信用卡(1234)',
+    交易状态: '交易成功',
+    交易订单号: 'TEST001001001001001001001',
+    商家订单号: 'TEST001001001001001001001',
+    备注: '',
+    数据来源: '支付宝',
+  },
+  // 充值缴费-广东联通
+  {
+    交易时间: '2025-09-04 15:18:34',
+    交易分类: '充值缴费',
+    交易对方: '广东联通',
+    对方账号: '/',
+    商品说明: '手机充值',
+    '收/支': '支出',
+    金额: '30.00',
+    '收/付款方式': '民生银行信用卡(1234)',
+    交易状态: '充值成功',
+    交易订单号: 'TEST002002002002002002002',
+    商家订单号: 'TEST002002002002002002002',
+    备注: '',
+    数据来源: '支付宝',
+  },
+  // 亲友代付
+  {
+    交易时间: '2025-08-25 07:03:38',
+    交易分类: '亲友代付',
+    交易对方: 'TestUser(*测)',
+    对方账号: '/',
+    商品说明: '亲情卡',
+    '收/支': '支出',
+    金额: '7.00',
+    '收/付款方式': '招商银行储蓄卡(1234)',
+    交易状态: '交易成功',
+    交易订单号: 'TEST003003003003003003003',
+    商家订单号: 'TEST003003003003003003003',
+    备注: '',
+    数据来源: '支付宝',
+  },
+];
 
-// URL测试数据
+// 聚合渠道测试数据 - 用于final.ts测试，包含所有支付渠道
+export const aggregatedChannelTestData: AggregatedChannelData = [
+  {
+    'Group1': {
+      channel: '微信支付' as PaymentChannel,
+      date: ['2025-06-08 00:00:00', '2025-09-08 23:59:59'] as [string, string],
+      data: wechatTestData,
+    },
+    'Group2': {
+      channel: '招商银行储蓄卡' as PaymentChannel,
+      date: ['2024-09-06 00:00:00', '2025-09-06 23:59:59'] as [string, string],
+      data: cmbDebitCardTestData,
+    },
+    'Group3': {
+      channel: '招商银行信用卡' as PaymentChannel,
+      date: ['2025-06-17 00:00:00', '2025-07-16 23:59:59'] as [string, string],
+      data: cmbCreditCardTestData,
+    },
+    'Group4': {
+      channel: '广发银行信用卡' as PaymentChannel,
+      date: ['2024-01-28 00:00:00', '2024-02-27 23:59:59'] as [string, string],
+      data: gfCreditCardTestData,
+    },
+    'Group5': {
+      channel: '支付宝' as PaymentChannel,
+      date: ['2025-08-12 00:00:00', '2025-09-12 23:59:59'] as [string, string],
+      data: alipayTestData,
+    },
+  }
+];
+
+// 美团原始输入数据（JSON字符串）- 脱敏后的数据
+export const meituanRawInputData = [
+  '[{"﻿美团交易账单明细":"美团用户名：[TestUser123]"},{"﻿美团交易账单明细":"起始时间：[2025-06-08] 终止时间：[2025-09-08]"},{"﻿美团交易账单明细":"导出交易类型：[全部]"},{"﻿美团交易账单明细":"导出时间：[2025-09-08 12:07:27]"},{"﻿美团交易账单明细":""},{"﻿美团交易账单明细":"共：8笔记录"},{"﻿美团交易账单明细":"支出：0笔 0.00元"},{"﻿美团交易账单明细":"收入：8笔 74.04元"},{"﻿美团交易账单明细":"不计收支：0笔 0.00元"},{"﻿美团交易账单明细":""},{"﻿美团交易账单明细":"特别提示："},{"﻿美团交易账单明细":"1. 本明细与实际交易结果不符时，以实际交易情况为准"},{"﻿美团交易账单明细":"2. 本明细仅展示当前账单中的交易，不包括已删除的记录"},{"﻿美团交易账单明细":"3. 部分账单记录如充值/提现等交易，不计入为收入或支出类别"},{"﻿美团交易账单明细":"4. 因统计逻辑不同，明细的实付金额累加后可能与统计金额不一致，请以实际交易金额为准"},{"﻿美团交易账单明细":"5. 本明细仅供用户个人对账使用，不具备任何证明效力，禁止用于非法用途"},{"﻿美团交易账单明细":""},{"﻿美团交易账单明细":"【美团交易账单明细列表】"},{"﻿美团交易账单明细":"交易创建时间","null":["交易成功时间","交易类型","订单标题","收/支","支付方式","订单金额","实付金额","交易单号","商家单号","备注"]},{"﻿美团交易账单明细":"2025-06-18 06:17:21","null":["2025-06-18 06:17:23","退款","【甄选爆款】11选1","收入","招商银行信用卡(1234)","¥2.66","¥2.66","TEST001001001001001\\t","MERCHANT001001001001\\t","/"]},{"﻿美团交易账单明细":"2025-07-15 17:13:46","null":["2025-07-15 17:13:56","退款","小象超市-订单编号TEST002002","收入","微信支付","¥0.18","¥0.18","TEST002002002002002\\t","TEST002002-MERCHANT002\\t","/"]},{"﻿美团交易账单明细":"2025-08-01 06:29:41","null":["2025-08-01 06:29:41","退款","【9.9喝咖啡】美式咖啡/拿铁咖啡2选1","收入","招商银行储蓄卡(5678)","¥8.57","¥8.57","TEST003003003003003\\t","MERCHANT003003003003\\t","/"]}]',
+];
+
+// 微信支付原始输入数据（JSON字符串）- 脱敏后的数据
+export const wechatRawInputData = '[{"微信支付账单明细":"微信昵称：[TestUser123]","Unnamed: 1":null,"Unnamed: 2":null,"Unnamed: 3":null,"Unnamed: 4":null,"Unnamed: 5":null,"Unnamed: 6":null,"Unnamed: 7":null,"Unnamed: 8":null,"Unnamed: 9":null,"Unnamed: 10":null},{"微信支付账单明细":"起始时间：[2025-06-08 00:00:00] 终止时间：[2025-09-08 23:59:59]","Unnamed: 1":null,"Unnamed: 2":null,"Unnamed: 3":null,"Unnamed: 4":null,"Unnamed: 5":null,"Unnamed: 6":null,"Unnamed: 7":null,"Unnamed: 8":null,"Unnamed: 9":null,"Unnamed: 10":null},{"微信支付账单明细":"导出类型：[全部]","Unnamed: 1":null,"Unnamed: 2":null,"Unnamed: 3":null,"Unnamed: 4":null,"Unnamed: 5":null,"Unnamed: 6":null,"Unnamed: 7":null,"Unnamed: 8":null,"Unnamed: 9":null,"Unnamed: 10":null},{"微信支付账单明细":"导出时间：[2025-09-11 17:43:36]","Unnamed: 1":null,"Unnamed: 2":null,"Unnamed: 3":null,"Unnamed: 4":null,"Unnamed: 5":null,"Unnamed: 6":null,"Unnamed: 7":null,"Unnamed: 8":null,"Unnamed: 9":null,"Unnamed: 10":null},{"微信支付账单明细":null,"Unnamed: 1":null,"Unnamed: 2":null,"Unnamed: 3":null,"Unnamed: 4":null,"Unnamed: 5":null,"Unnamed: 6":null,"Unnamed: 7":null,"Unnamed: 8":null,"Unnamed: 9":null,"Unnamed: 10":null},{"微信支付账单明细":"共3笔记录","Unnamed: 1":null,"Unnamed: 2":null,"Unnamed: 3":null,"Unnamed: 4":null,"Unnamed: 5":null,"Unnamed: 6":null,"Unnamed: 7":null,"Unnamed: 8":null,"Unnamed: 9":null,"Unnamed: 10":null},{"微信支付账单明细":"收入：1笔 0.18元","Unnamed: 1":null,"Unnamed: 2":null,"Unnamed: 3":null,"Unnamed: 4":null,"Unnamed: 5":null,"Unnamed: 6":null,"Unnamed: 7":null,"Unnamed: 8":null,"Unnamed: 9":null,"Unnamed: 10":null},{"微信支付账单明细":"支出：2笔 86.56元","Unnamed: 1":null,"Unnamed: 2":null,"Unnamed: 3":null,"Unnamed: 4":null,"Unnamed: 5":null,"Unnamed: 6":null,"Unnamed: 7":null,"Unnamed: 8":null,"Unnamed: 9":null,"Unnamed: 10":null},{"微信支付账单明细":"中性交易：0笔 0.00元","Unnamed: 1":null,"Unnamed: 2":null,"Unnamed: 3":null,"Unnamed: 4":null,"Unnamed: 5":null,"Unnamed: 6":null,"Unnamed: 7":null,"Unnamed: 8":null,"Unnamed: 9":null,"Unnamed: 10":null},{"微信支付账单明细":"注：","Unnamed: 1":null,"Unnamed: 2":null,"Unnamed: 3":null,"Unnamed: 4":null,"Unnamed: 5":null,"Unnamed: 6":null,"Unnamed: 7":null,"Unnamed: 8":null,"Unnamed: 9":null,"Unnamed: 10":null},{"微信支付账单明细":"1. 充值\\/提现\\/理财通购买\\/零钱通存取\\/信用卡还款等交易，将计入中性交易","Unnamed: 1":null,"Unnamed: 2":null,"Unnamed: 3":null,"Unnamed: 4":null,"Unnamed: 5":null,"Unnamed: 6":null,"Unnamed: 7":null,"Unnamed: 8":null,"Unnamed: 9":null,"Unnamed: 10":null},{"微信支付账单明细":"2. 若交易记录明细无有效内容，则代表该时间段内此微信号无交易。","Unnamed: 1":null,"Unnamed: 2":null,"Unnamed: 3":null,"Unnamed: 4":null,"Unnamed: 5":null,"Unnamed: 6":null,"Unnamed: 7":null,"Unnamed: 8":null,"Unnamed: 9":null,"Unnamed: 10":null},{"微信支付账单明细":"3. 本明细仅供个人对账使用","Unnamed: 1":null,"Unnamed: 2":null,"Unnamed: 3":null,"Unnamed: 4":null,"Unnamed: 5":null,"Unnamed: 6":null,"Unnamed: 7":null,"Unnamed: 8":null,"Unnamed: 9":null,"Unnamed: 10":null},{"微信支付账单明细":null,"Unnamed: 1":null,"Unnamed: 2":null,"Unnamed: 3":null,"Unnamed: 4":null,"Unnamed: 5":null,"Unnamed: 6":null,"Unnamed: 7":null,"Unnamed: 8":null,"Unnamed: 9":null,"Unnamed: 10":null},{"微信支付账单明细":"----------------------微信支付账单明细列表--------------------","Unnamed: 1":null,"Unnamed: 2":null,"Unnamed: 3":null,"Unnamed: 4":null,"Unnamed: 5":null,"Unnamed: 6":null,"Unnamed: 7":null,"Unnamed: 8":null,"Unnamed: 9":null,"Unnamed: 10":null},{"微信支付账单明细":"交易时间","Unnamed: 1":"交易类型","Unnamed: 2":"交易对方","Unnamed: 3":"商品","Unnamed: 4":"收\\/支","Unnamed: 5":"金额(元)","Unnamed: 6":"支付方式","Unnamed: 7":"当前状态","Unnamed: 8":"交易单号","Unnamed: 9":"商户单号","Unnamed: 10":"备注"},{"微信支付账单明细":"2025-09-08 15:53:25","Unnamed: 1":"商户消费","Unnamed: 2":"朴朴超市","Unnamed: 3":"朴朴商品订单","Unnamed: 4":"支出","Unnamed: 5":"¥70.56","Unnamed: 6":"招商银行储蓄卡(1234)","Unnamed: 7":"支付成功","Unnamed: 8":"WX001001001001001001001","Unnamed: 9":"TEST001001001001PAY01","Unnamed: 10":"\\/"},{"微信支付账单明细":"2025-09-06 20:12:28","Unnamed: 1":"扫二维码付款","Unnamed: 2":"清润坊甜品","Unnamed: 3":"收款方备注:二维码收款","Unnamed: 4":"支出","Unnamed: 5":"¥16.00","Unnamed: 6":"招商银行储蓄卡(1234)","Unnamed: 7":"已转账","Unnamed: 8":"WX002002002002002002002","Unnamed: 9":"TEST002002002002002","Unnamed: 10":"\\/"},{"微信支付账单明细":"2025-07-15 17:13:51","Unnamed: 1":"美团-退款","Unnamed: 2":"美团","Unnamed: 3":"美团","Unnamed: 4":"收入","Unnamed: 5":"¥0.18","Unnamed: 6":"招商银行信用卡(1234)","Unnamed: 7":"已退款￥0.18","Unnamed: 8":"WX003003003003003003003","Unnamed: 9":"","Unnamed: 10":"\\/"}]';
+
+// 招商银行储蓄卡原始输入数据（PDF文本）- 脱敏后的数据
+export const cmbDebitCardRawInputData = '\n\n1/16\n招商银行交易流水\nTransaction Statement of China Merchants Bank\n2024-09-06 -- 2025-09-06\n户  名：TestUser123\nName\n账户类型：ALL/全币种\nAccount Type\n申请时间：2025-09-08 19:15:51\nDate\n账号：6214851201814567\nAccount No\n开 户 行：广州测试支行\nSub Branch\n验 证 码：TEST123\nVerification Code\n记账日期货币交易金额联机余额交易摘要对手信息\nDateCurrency\nTransaction\nAmount\nBalanceTransaction TypeCounter Party\n2024-09-15CNY-50.0012,345.67快捷支付岭南通TEST001001001\n2024-09-15CNY-28.0012,317.67快捷支付扫二维码付款TEST002002002\n2025-09-08CNY-70.5612,247.11快捷支付微信转账TEST003003003\n';
+
+// URL测试数据 - 基于demo实际文件名
 export const urlTestData = [
   {
-    input: 'https://example.com/download?x-wf-file_name=微信支付账单_2025-09-08.xlsx',
+    input: 'https://example.com/download?x-wf-file_name=%E7%BE%8E%E5%9B%A2%E8%B4%A6%E5%8D%95%2820250608-20250908%29.csv',
+    expected: '美团',
+  },
+  {
+    input: 'https://example.com/download?x-wf-file_name=%E5%BE%AE%E4%BF%A1%E6%94%AF%E4%BB%98%E8%B4%A6%E5%8D%95%E6%B5%81%E6%B0%B4%E6%96%87%E4%BB%B6%2820250608-20250908%29%E2%80%94%E2%80%94%E3%80%90%E8%A7%A3%E5%8E%8B%E5%AF%86%E7%A0%81%E5%8F%AF%E5%9C%A8%E5%BE%AE%E4%BF%A1%E6%94%AF%E4%BB%98%E5%85%AC%E4%BC%97%E5%8F%B7%E6%9F%A5%E7%9C%8B%E3%80%91.xlsx',
     expected: '微信支付',
   },
   {
-    input: 'https://example.com/download?x-wf-file_name=招商银行交易流水_2024-09-06.pdf',
+    input: 'https://example.com/download?x-wf-file_name=%E6%8B%9B%E5%95%86%E9%93%B6%E8%A1%8C%E4%BA%A4%E6%98%93%E6%B5%81%E6%B0%B4%28%E7%94%B3%E8%AF%B7%E6%97%B6%E9%97%B42025%E5%B9%B409%E6%9C%8808%E6%97%A519%E6%97%B615%E5%88%8651%E7%A7%92%29+2.pdf',
     expected: '招商银行储蓄卡',
   },
   {
-    input: 'https://example.com/download?x-wf-file_name=招商银行信用卡账单_2024年9月.pdf',
+    input: 'https://example.com/download?x-wf-file_name=2025%E5%B9%B407%E6%9C%88%E4%BF%A1%E7%94%A8%E5%8D%A1%E8%B4%A6%E5%8D%95.pdf',
     expected: '招商银行信用卡',
   },
   {
-    input: 'https://example.com/download?x-wf-file_name=支付宝账单_2025-09-08.xlsx',
+    input: 'https://example.com/download?x-wf-file_name=2024%E5%B9%B402%E6%9C%88%E7%BB%BC%E5%90%88%E5%AF%B9%E8%B4%A6%E5%8D%95%E6%89%93%E5%8D%B0%E7%89%88.pdf',
+    expected: '广发银行信用卡',
+  },
+  {
+    input: 'https://example.com/download?x-wf-file_name=%E6%94%AF%E4%BB%98%E5%AE%9D%E4%BA%A4%E6%98%93%E6%98%8E%E7%BB%86%2820250812-20250912%29.csv',
     expected: '支付宝',
   },
   {
@@ -110,3 +391,438 @@ export const urlTestData = [
     expected: '',
   },
 ];
+
+// 增强的URL测试数据 - 基于demo实际文件名的变体场景
+export const enhancedUrlTestData = [
+  // 招商银行储蓄卡 - 带时间戳和序号
+  {
+    input: 'https://example.com/download?x-wf-file_name=%E6%8B%9B%E5%95%86%E9%93%B6%E8%A1%8C%E4%BA%A4%E6%98%93%E6%B5%81%E6%B0%B4%28%E7%94%B3%E8%AF%B7%E6%97%B6%E9%97%B42025%E5%B9%B409%E6%9C%8808%E6%97%A519%E6%97%B615%E5%88%8651%E7%A7%92%29.pdf',
+    expected: '招商银行储蓄卡',
+  },
+  // 微信支付 - 带压缩包说明和序号
+  {
+    input: 'https://example.com/download?x-wf-file_name=%E5%BE%AE%E4%BF%A1%E6%94%AF%E4%BB%98%E8%B4%A6%E5%8D%95%E6%B5%81%E6%B0%B4%E6%96%87%E4%BB%B6%2820250608-20250908%29%20(2).xlsx',
+    expected: '微信支付',
+  },
+  // 支付宝 - 带副本标识
+  {
+    input: 'https://example.com/download?x-wf-file_name=%E6%94%AF%E4%BB%98%E5%AE%9D%E4%BA%A4%E6%98%93%E6%98%8E%E7%BB%86%2820250812-20250912%29%20%E5%89%AF%E6%9C%AC.csv',
+    expected: '支付宝',
+  },
+  // 招商银行信用卡 - 带序号
+  {
+    input: 'https://example.com/download?x-wf-file_name=2025%E5%B9%B407%E6%9C%88%E4%BF%A1%E7%94%A8%E5%8D%A1%E8%B4%A6%E5%8D%95%20(2).pdf',
+    expected: '招商银行信用卡',
+  },
+  // 广发银行信用卡 - 带序号
+  {
+    input: 'https://example.com/download?x-wf-file_name=2024%E5%B9%B402%E6%9C%88%E7%BB%BC%E5%90%88%E5%AF%B9%E8%B4%A6%E5%8D%95%E6%89%93%E5%8D%B0%E7%89%88%203.pdf',
+    expected: '广发银行信用卡',
+  },
+  // 美团 - 带副本标识
+  {
+    input: 'https://example.com/download?x-wf-file_name=%E7%BE%8E%E5%9B%A2%E8%B4%A6%E5%8D%95%2820250608-20250908%29%20%E5%89%AF%E6%9C%AC.csv',
+    expected: '美团',
+  },
+];
+
+// 日期解析测试数据
+export const dateParsingTestData = {
+  meituan: {
+    simple: '[{"美团交易账单明细":"起始时间：[2025-06-08] 终止时间：[2025-09-08]"}]',
+    full: '[{"美团交易账单明细":"起始时间：[2025-06-08 00:00:00] 终止时间：[2025-09-08 23:59:59]"}]',
+    invalid: '[{"美团交易账单明细":"起始时间：[2025-13-45] 终止时间：[2025-02-30]"}]'
+  },
+  wechat: {
+    full: '[{"微信支付账单明细":"起始时间：[2025-06-08 00:00:00] 终止时间：[2025-09-08 23:59:59]"}]',
+    simple: '[{"微信支付账单明细":"起始时间：[2025-06-08] 终止时间：[2025-09-08]"}]'
+  },
+  alipay: {
+    normal: '[["起始时间：[2025-08-12 00:00:00]    终止时间：[2025-09-12 23:59:59]",null,null,null,null,null,null,null,null,null,null,null,null]]',
+    multiSpace: '[["起始时间：[2025-08-12 00:00:00]     终止时间：[2025-09-12 23:59:59]",null]]'
+  },
+  cmbCredit: {
+    normal: `账单日  
+2025年07月16日
+Statement Date  
+信用额度  
+¥ 28,000.00
+Credit Limit  
+到期还款日  
+2025年08月04日
+Payment Due Date`,
+    invalid: `账单日  
+2025年13月45日
+Statement Date  
+到期还款日  
+2025年02月30日
+Payment Due Date`
+  },
+  cmbDebit: {
+    normal: `招商银行交易流水
+Transaction Statement of China Merchants Bank
+2024-09-06 -- 2025-09-06`,
+    singleDash: `招商银行交易流水
+Transaction Statement of China Merchants Bank
+2024-09-06 - 2025-09-06`
+  },
+  gfCredit: {
+    normal: `信用卡账户信息
+账单周期2024/01/28 - 2024/02/27个人消费额度30,000.00`,
+    dashFormat: `账单周期2024-01-28 - 2024-02-27个人消费额度`
+  }
+};
+
+// 支付宝原始输入数据（JSON字符串）- 脱敏后的数据
+export const alipayRawInputData = [
+  '[["------------------------------------------------------------------------------------",null,null,null,null,null,null,null,null,null,null,null,null],["导出信息：",null,null,null,null,null,null,null,null,null,null,null,null],["姓名：TestUser123",null,null,null,null,null,null,null,null,null,null,null,null],["支付宝账户：178****1234",null,null,null,null,null,null,null,null,null,null,null,null],["起始时间：[2025-08-12 00:00:00]    终止时间：[2025-09-12 23:59:59]",null,null,null,null,null,null,null,null,null,null,null,null],["导出交易类型：[全部]",null,null,null,null,null,null,null,null,null,null,null,null],["导出时间：[2025-09-12 10:38:23]",null,null,null,null,null,null,null,null,null,null,null,null],["共3笔记录",null,null,null,null,null,null,null,null,null,null,null,null],["收入：0笔 0.00元",null,null,null,null,null,null,null,null,null,null,null,null],["支出：3笔 73.06元",null,null,null,null,null,null,null,null,null,null,null,null],["不计收支：0笔 0.00元",null,null,null,null,null,null,null,null,null,null,null,null],["------------------------支付宝（中国）网络技术有限公司  电子客户回单------------------------",null,null,null,null,null,null,null,null,null,null,null,null],["交易时间","交易分类","交易对方","对方账号","商品说明","收/支","金额","收/付款方式","交易状态","交易订单号","商家订单号","备注",null],["2025-09-11 15:17:22","餐饮美食","广州盒马","test***@163.com","盒马烘焙X吾岛 希腊酸奶米乳三明治 150g等3类商品","支出","36.06","民生银行信用卡(1234)","交易成功","TEST001001001001001001001","TEST001001001001001001001",null,null],["2025-09-04 15:18:34","充值缴费","广东联通","/","手机充值","支出","30.00","民生银行信用卡(1234)","充值成功","TEST002002002002002002002","TEST002002002002002002002",null,null],["2025-08-25 07:03:38","亲友代付","TestUser(*测)","/","亲情卡","支出","7.00","招商银行储蓄卡(1234)","交易成功","TEST003003003003003003003","TEST003003003003003003003",null,null]]'
+];
+
+// 招商银行信用卡原始输入数据（PDF文本）- 脱敏后的数据
+export const cmbCreditCardRawInputData = `
+TEST1234
+广东省广州市
+测试区测试街道测试路123号测试大厦
+TestUser123  
+账单日  
+2025年07月16日
+Statement Date  
+信用额度  
+¥ 28,000.00
+Credit Limit  
+到期还款日  
+2025年08月04日
+Payment Due Date  
+本期还款总额  
+¥ 585.83
+¥ 306.34
+Current Balance  
+本期最低还款额  
+Minimum Payment  
+  本期账务明细 Transaction Details  
+  人民币账户 RMB A/C  
+交易日记账日交易摘要人民币金额卡号末四位交易地金额
+SOLDPOSTEDDESCRIPTIONRMB AMOUNTCARD NO(Last 4digits)Original Tran Amount
+ 退款
+ 06/18 06/19 美团支付-美团App咖啡-2.661234-2.66(CN)
+ 07/15 07/16 财付通-美团-0.181234-0.18(CN)
+ 消费
+ 06/20 06/21 美团支付-美团AppKOIThé20.80123420.80(CN)
+`;
+
+// 广发银行信用卡原始输入数据（PDF文本）- 脱敏后的数据
+export const gfCreditCardRawInputData = `
+客户星级
+ ★★★
+ 信用卡账户信息
+账单周期2024/01/28 - 2024/02/27个人消费额度30,000.00
+卡号末四位本期账单金额最低还款额最后还款日入账货币存款卡片消费额度
+12343,100.18156.002024/03/16人民币0.0030,000.00
+注：若您名下的多张信用卡主卡均有欠款，需分别还款。
+交易日期入账日期交易摘要交易金额交易货币入账金额入账货币
+ 交易明细
+ 卡号：6251********1234
+2024/02/242024/02/25
+(消费)（特约）美团
+46.00 人民币46.00 人民币
+2024/02/222024/02/23
+(退货)（特约）美团
+-2.49 人民币-2.49 人民币
+2024/02/242024/02/24
+(消费)财付通-广州测试咖啡店有限公司
+36.00 人民币36.00 人民币
+TEST1234
+广东省 广州市
+测试路298号测试商业中心中区10层测试公司
+TestUser123
+`;
+
+// 数据解析测试数据
+export const dataParsingTestData = {
+  meituan: {
+    complete: '[{"美团交易账单明细":"2025-06-02 15:08:21","null":["2025-06-02 15:08:27","支付","茉莉奶白 订单详情","支出","招商银行信用卡()","¥16.00","¥16.00","123\\t","123\\t","/"]}]',
+    incomplete: '[{"美团交易账单明细":"不完整的数据"}]',
+    specialChars: '[{"美团交易账单明细":"包含特殊字符的数据：!@#$%^&*()"}]'
+  },
+  wechat: {
+    complete: '[{"微信支付账单明细":"2025-09-08 15:53:25","Unnamed: 1":"商户消费","Unnamed: 2":"朴朴超市","Unnamed: 3":"朴朴商品订单","Unnamed: 4":"支出","Unnamed: 5":"¥70.56","Unnamed: 6":"招商银行储蓄卡(4105)","Unnamed: 7":"支付成功","Unnamed: 8":"4200002811202509080506955124","Unnamed: 9":"0405757317994379PAY01","Unnamed: 10":"\\/"}]',
+    invalidJson: '{"invalid": json}',
+    empty: ''
+  },
+  alipay: {
+    complete: '[["起始时间：[2025-08-12 00:00:00]    终止时间：[2025-09-12 23:59:59]",null,null,null,null,null,null,null,null,null,null,null,null]]',
+    invalidFormat: '[["不正确的格式"]]',
+    empty: '[]'
+  },
+  cmbDebit: {
+    normal: `1/16
+招商银行交易流水
+Transaction Statement of China Merchants Bank
+2024-09-06 -- 2025-09-06
+户  名：TestUser
+Name
+账户类型：ALL/全币种
+Account Type
+申请时间：2025-09-08 19:15:51
+Date
+账号：6214851201814105
+Account No
+开 户 行：广州支行
+Sub Branch
+验 证 码：644444
+Verification Code
+记账日期货币交易金额联机余额交易摘要对手信息
+DateCurrency
+Transaction
+Amount
+BalanceTransaction TypeCounter Party
+2024-09-15CNY-50.0055,760.81快捷支付岭南通 1235276502`,
+    incomplete: `招商银行交易流水
+Transaction Statement of China Merchants Bank
+不完整的PDF文本`
+  },
+  cmbCredit: {
+    normal: `账单日  
+2025年07月16日
+Statement Date  
+信用额度  
+¥ 28,000.00
+Credit Limit  
+到期还款日  
+2025年08月04日
+Payment Due Date`,
+    incomplete: `账单日  
+不完整的PDF文本`
+  },
+  gfCredit: {
+    normal: `信用卡账户信息
+账单周期2024/01/28 - 2024/02/27个人消费额度30,000.00`,
+    incomplete: `信用卡账户信息
+不完整的PDF文本`
+  }
+};
+
+// Final.ts测试专用数据 - 基于美团退款匹配规则的全面测试场景
+// 
+// 匹配规则说明：
+// 强规则：1. 金额精确匹配  2. 时间误差±2小时内
+// 弱规则：1. 包含"美团"关键词  2. 包含"退款"关键词  3. 支付方式匹配
+export const finalTestScenarios = {
+  // 【强规则匹配】完美匹配：金额精确+时间在误差内+弱规则全满足
+  perfectMatch: {
+    meituanOrder: {
+      交易创建时间: '2025-07-15 17:13:46',
+      交易成功时间: '2025-07-15 17:13:56',
+      订单金额: '¥0.18',
+      实付金额: '¥0.18',
+      订单标题: '小象超市-订单编号TEST002002',
+      备注: '/',
+      交易单号: 'TEST002002002002002',
+      商家单号: 'TEST002002-MERCHANT002',
+      交易类型: '退款',
+      '收/支': '收入',
+      支付方式: '微信支付',
+    },
+    paymentData: {
+      交易时间: '2025-07-15 17:13:51', // 时间差5秒，在±2小时内
+      '金额(元)': '¥0.18', // 金额精确匹配
+      支付方式: '招商银行信用卡(1234)',
+      商户单号: '',
+      备注: '/',
+      当前状态: '已退款￥0.18',
+      交易类型: '美团-退款', // 包含"美团"+"退款"关键词
+      交易对方: '美团',
+      商品: '美团',
+      '收/支': '收入',
+      交易单号: 'WX003003003003003003003',
+      数据来源: '微信支付',
+    }
+  },
+
+  // 【边界测试】时间误差边界：1小时59分59秒（应该匹配）
+  timeBoundaryMatch: {
+    meituanOrder: {
+      交易创建时间: '2025-07-15 17:13:46',
+      交易成功时间: '2025-07-15 17:13:56',
+      订单金额: '¥2.66',
+      实付金额: '¥2.66',
+      订单标题: '【甄选爆款】11选1',
+      备注: '/',
+      交易单号: 'TEST001001001001001',
+      商家单号: 'MERCHANT001001001001',
+      交易类型: '退款',
+      '收/支': '收入',
+      支付方式: '招商银行信用卡(1234)',
+    },
+    paymentData: {
+      交易时间: '2025-07-15 19:13:55', // 时间差1小时59分59秒
+      '金额(元)': '¥2.66',
+      支付方式: '招商银行信用卡(1234)',
+      商户单号: '',
+      备注: '/',
+      当前状态: '已退款￥2.66',
+      交易类型: '美团-退款',
+      交易对方: '美团',
+      商品: '美团',
+      '收/支': '收入',
+      交易单号: 'TEST001001001001001001001',
+      数据来源: '微信支付',
+    }
+  },
+
+  // 【边界测试】时间误差超出：2小时1秒（不应该匹配）
+  timeExceedBoundary: {
+    meituanOrder: {
+      交易创建时间: '2025-08-01 06:29:41',
+      交易成功时间: '2025-08-01 06:29:41',
+      订单金额: '¥8.57',
+      实付金额: '¥8.57',
+      订单标题: '【9.9喝咖啡】美式咖啡/拿铁咖啡2选1',
+      备注: '/',
+      交易单号: 'TEST003003003003003',
+      商家单号: 'MERCHANT003003003003',
+      交易类型: '退款',
+      '收/支': '收入',
+      支付方式: '招商银行储蓄卡(5678)',
+    },
+    paymentData: {
+      交易时间: '2025-08-01 08:29:42', // 时间差2小时1秒，超出范围
+      '金额(元)': '¥8.57',
+      支付方式: '招商银行储蓄卡(5678)',
+      商户单号: 'TEST003003003003PAY03',
+      备注: '/',
+      当前状态: '支付成功',
+      交易类型: '商户消费',
+      交易对方: '咖啡店',
+      商品: '咖啡订单',
+      '收/支': '支出',
+      交易单号: 'TEST003003003003003003003',
+      数据来源: '招商银行储蓄卡',
+    }
+  },
+
+  // 【金额不匹配】时间匹配但金额不同（不应该匹配）
+  amountMismatch: {
+    meituanOrder: {
+      交易创建时间: '2025-06-20 06:21:00',
+      交易成功时间: '2025-06-20 06:21:05',
+      订单金额: '¥20.80',
+      实付金额: '¥20.80',
+      订单标题: 'KOI Thé茶饮订单',
+      备注: '/',
+      交易单号: 'TEST004004004004004',
+      商家单号: 'MERCHANT004004004004',
+      交易类型: '退款',
+      '收/支': '收入',
+      支付方式: '招商银行信用卡(1234)',
+    },
+    paymentData: {
+      交易时间: '2025-06-20 06:21:10', // 时间匹配
+      '金额(元)': '¥20.81', // 金额不匹配（差0.01元）
+      支付方式: '招商银行信用卡(1234)',
+      商户单号: '',
+      备注: '/',
+      当前状态: '已退款￥20.81',
+      交易类型: '美团-退款',
+      交易对方: '美团',
+      商品: '美团',
+      '收/支': '收入',
+      交易单号: 'TEST004004004004004004004',
+      数据来源: '微信支付',
+    }
+  },
+
+  // 【未匹配场景】美团订单在支付渠道中找不到对应记录
+  unmatch: {
+    meituanOrder: {
+      交易创建时间: '2025-06-18 06:17:21',
+      交易成功时间: '2025-06-18 06:17:23',
+      订单金额: '¥2.66',
+      实付金额: '¥2.66',
+      订单标题: '【甄选爆款】11选1',
+      备注: '/',
+      交易单号: 'TEST001001001001001',
+      商家单号: 'MERCHANT001001001001',
+      交易类型: '退款',
+      '收/支': '收入',
+      支付方式: '招商银行信用卡(1234)',
+    }
+    // 注意：此场景没有对应的paymentData，用于测试unmatch情况
+  },
+
+  // 【未覆盖场景】支付渠道数据在美团订单中找不到对应记录
+  uncover: {
+    paymentData: {
+      交易时间: '2025-09-08 15:53:25',
+      '金额(元)': '¥70.56',
+      支付方式: '招商银行储蓄卡(1234)',
+      商户单号: 'TEST001001001001PAY01',
+      备注: '/',
+      当前状态: '支付成功',
+      交易类型: '商户消费',
+      交易对方: '朴朴超市',
+      商品: '朴朴商品订单',
+      '收/支': '支出',
+      交易单号: 'WX001001001001001001001',
+      数据来源: '微信支付',
+    }
+    // 注意：此场景没有对应的meituanOrder，用于测试uncover情况
+  },
+
+  // 【弱规则测试】仅满足强规则，弱规则部分满足（应该匹配）
+  weakRulePartialMatch: {
+    meituanOrder: {
+      交易创建时间: '2025-06-25 06:26:00',
+      交易成功时间: '2025-06-25 06:26:05',
+      订单金额: '¥3.19',
+      实付金额: '¥3.19',
+      订单标题: '蜜雪冰城订单',
+      备注: '/',
+      交易单号: 'TEST005005005005005',
+      商家单号: 'MERCHANT005005005005',
+      交易类型: '退款',
+      '收/支': '收入',
+      支付方式: '招商银行信用卡(1234)',
+    },
+    paymentData: {
+      交易时间: '2025-06-25 06:26:10',
+      '金额(元)': '¥3.19', // 金额匹配
+      支付方式: '招商银行信用卡(1234)',
+      商户单号: '',
+      备注: '/',
+      当前状态: '已退款￥3.19',
+      交易类型: '第三方退款', // 不包含"美团"但包含"退款"
+      交易对方: '蜜雪冰城',
+      商品: '饮品退款',
+      '收/支': '收入',
+      交易单号: 'TEST005005005005005005005',
+      数据来源: '招商银行信用卡',
+    }
+  },
+
+  // 【信用卡金额符号测试】招商银行信用卡负数表示退款
+  creditCardAmountSign: {
+    meituanOrder: {
+      交易创建时间: '2025-06-18 06:17:21',
+      交易成功时间: '2025-06-18 06:17:23',
+      订单金额: '¥2.66',
+      实付金额: '¥2.66',
+      订单标题: '库迪咖啡订单',
+      备注: '/',
+      交易单号: 'TEST006006006006006',
+      商家单号: 'MERCHANT006006006006',
+      交易类型: '退款',
+      '收/支': '收入',
+      支付方式: '招商银行信用卡(1234)',
+    },
+    paymentData: {
+      交易日: '06/18',
+      记账日: '06/19',
+      交易摘要: '美团支付-美团App咖啡',
+      人民币金额: '-2.66', // 招商银行信用卡：负数表示退款
+      卡号末四位: '1234',
+      交易地金额: '-2.66(CN)',
+      数据来源: '招商银行信用卡',
+    }
+  }
+};

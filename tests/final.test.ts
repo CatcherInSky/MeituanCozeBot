@@ -48,7 +48,7 @@ describe('final.ts - 美团订单与支付渠道数据匹配处理', () => {
         支付方式: '招商银行储蓄卡()',
       };
 
-      const input: AggregatedChannelData = {
+      const input: AggregatedChannelData = [{
         Group1: {
           channel: '微信支付',
           date: ['2025-06-08 00:00:00', '2025-09-08 23:59:59'],
@@ -58,7 +58,7 @@ describe('final.ts - 美团订单与支付渠道数据匹配处理', () => {
             交易时间: '2025-09-08 15:53:25',
           }],
         },
-      };
+      }];
 
       const result = await main({ params: { input, meituan: [meituanOrder] } });
 
@@ -76,7 +76,7 @@ describe('final.ts - 美团订单与支付渠道数据匹配处理', () => {
         支付方式: '招商银行储蓄卡()',
       };
 
-      const input: AggregatedChannelData = {
+      const input: AggregatedChannelData = [{
         Group1: {
           channel: '微信支付',
           date: ['2025-06-08 00:00:00', '2025-09-08 23:59:59'],
@@ -86,7 +86,7 @@ describe('final.ts - 美团订单与支付渠道数据匹配处理', () => {
             交易时间: '2025-09-08 15:53:25',
           }],
         },
-      };
+      }];
 
       const result = await main({ params: { input, meituan: [meituanOrder] } });
 
@@ -103,7 +103,7 @@ describe('final.ts - 美团订单与支付渠道数据匹配处理', () => {
         支付方式: '招商银行储蓄卡()',
       };
 
-      const input: AggregatedChannelData = {
+      const input: AggregatedChannelData = [{
         Group1: {
           channel: '微信支付',
           date: ['2025-06-08 00:00:00', '2025-09-08 23:59:59'], // 时间范围
@@ -113,7 +113,7 @@ describe('final.ts - 美团订单与支付渠道数据匹配处理', () => {
             交易时间: '2025-09-08 15:53:25',
           }],
         },
-      };
+      }];
 
       const result = await main({ params: { input, meituan: [meituanOrder] } });
 
@@ -128,13 +128,13 @@ describe('final.ts - 美团订单与支付渠道数据匹配处理', () => {
         支付方式: '未知支付方式', // 不匹配的支付方式
       };
 
-      const input: AggregatedChannelData = {
+      const input: AggregatedChannelData = [{
         Group1: {
           channel: '微信支付',
           date: ['2025-06-08 00:00:00', '2025-09-08 23:59:59'],
           data: [wechatTestData[0]],
         },
-      };
+      }];
 
       const result = await main({ params: { input, meituan: [meituanOrder] } });
 
@@ -154,7 +154,7 @@ describe('final.ts - 美团订单与支付渠道数据匹配处理', () => {
         支付方式: '微信支付',
       };
 
-      const input: AggregatedChannelData = {
+      const input: AggregatedChannelData = [{
         Group1: {
           channel: '微信支付',
           date: ['2025-06-08 00:00:00', '2025-09-08 23:59:59'],
@@ -164,7 +164,7 @@ describe('final.ts - 美团订单与支付渠道数据匹配处理', () => {
             交易时间: '2025-09-08 15:53:25',
           }],
         },
-      };
+      }];
 
       const result = await main({ params: { input, meituan: [meituanOrder] } });
 
@@ -179,7 +179,7 @@ describe('final.ts - 美团订单与支付渠道数据匹配处理', () => {
         支付方式: '招商银行储蓄卡',
       };
 
-      const input: AggregatedChannelData = {
+      const input: AggregatedChannelData = [{
         Group1: {
           channel: '招商银行储蓄卡',
           date: ['2024-09-06 00:00:00', '2025-09-06 23:59:59'],
@@ -189,7 +189,7 @@ describe('final.ts - 美团订单与支付渠道数据匹配处理', () => {
             记账日期: '2024-09-15',
           }],
         },
-      };
+      }];
 
       const result = await main({ params: { input, meituan: [meituanOrder] } });
 
@@ -213,14 +213,14 @@ describe('final.ts - 美团订单与支付渠道数据匹配处理', () => {
     });
 
     test('应该处理null的渠道数据', async () => {
-      const input: AggregatedChannelData = {
+      const input: AggregatedChannelData = [{
         Group1: null,
         Group2: {
           channel: '微信支付',
           date: ['2025-06-08 00:00:00', '2025-09-08 23:59:59'],
           data: [wechatTestData[0]],
         },
-      };
+      }];
 
       const result = await main({ 
         params: { 
@@ -240,7 +240,7 @@ describe('final.ts - 美团订单与支付渠道数据匹配处理', () => {
         支付方式: '招商银行储蓄卡()',
       };
 
-      const input: AggregatedChannelData = {
+      const input: AggregatedChannelData = [{
         Group1: {
           channel: '微信支付',
           date: ['2025-06-08 00:00:00', '2025-09-08 23:59:59'],
@@ -258,7 +258,7 @@ describe('final.ts - 美团订单与支付渠道数据匹配处理', () => {
             },
           ],
         },
-      };
+      }];
 
       const result = await main({ params: { input, meituan: [meituanOrder] } });
 
@@ -277,7 +277,7 @@ describe('final.ts - 美团订单与支付渠道数据匹配处理', () => {
         实付金额: `¥${(i + 1) * 10}.00`,
       }));
 
-      const largeInput: AggregatedChannelData = {
+      const largeInput: AggregatedChannelData = [{
         Group1: {
           channel: '微信支付',
           date: ['2025-06-08 00:00:00', '2025-09-08 23:59:59'],
@@ -287,7 +287,7 @@ describe('final.ts - 美团订单与支付渠道数据匹配处理', () => {
             '金额(元)': `¥${(i + 1) * 10}.00`,
           })),
         },
-      };
+      }];
 
       const startTime = Date.now();
       const result = await main({ 
