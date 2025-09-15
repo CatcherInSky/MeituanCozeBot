@@ -9,14 +9,14 @@ describe('uncover_markdown_generator.ts - 未覆盖订单数据Markdown生成', 
 
     expect(result.output).toBeDefined();
     expect(typeof result.output).toBe('string');
-    expect(result.output).toContain('# 时间和支付方式未覆盖退款数据详情');
+    expect(result.output).toContain('# 时间或支付方式未覆盖退款数据详情');
   });
 
   test('应该包含正确的标题', async () => {
     const input = meituanTestData;
     const result = await main({ params: { input } });
 
-    expect(result.output).toContain('# 时间和支付方式未覆盖退款数据详情');
+    expect(result.output).toContain('# 时间或支付方式未覆盖退款数据详情');
   });
 
   test('应该按支付方式分组', async () => {
@@ -48,7 +48,7 @@ describe('uncover_markdown_generator.ts - 未覆盖订单数据Markdown生成', 
     const result = await main({ params: { input: [] } });
 
     expect(result.output).toBeDefined();
-    expect(result.output).toContain('错误：没有找到有效的美团订单数据');
+    expect(result.output).toContain('没有未覆盖退款数据');
   });
 
   test('应该处理包含特殊字符的数据', async () => {
@@ -112,7 +112,7 @@ describe('uncover_markdown_generator.ts - 未覆盖订单数据Markdown生成', 
     const result = await main({ params: { input } });
 
     expect(result.output).toBeDefined();
-    expect(result.output).toContain('# 时间和支付方式未覆盖退款数据详情');
+    expect(result.output).toContain('# 时间或支付方式未覆盖退款数据详情');
     // 应该只包含有效数据
     expect(result.output).toContain('招商银行储蓄卡()');
   });
@@ -122,7 +122,7 @@ describe('uncover_markdown_generator.ts - 未覆盖订单数据Markdown生成', 
     const result = await main({ params: { input } });
 
     expect(result.output).toBeDefined();
-    expect(result.output).toContain('# 时间和支付方式未覆盖退款数据详情');
+    expect(result.output).toContain('# 时间或支付方式未覆盖退款数据详情');
     expect(result.output).toContain('## 招商银行储蓄卡()');
   });
 

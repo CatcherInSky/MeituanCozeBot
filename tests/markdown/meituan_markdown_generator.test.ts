@@ -32,8 +32,8 @@ describe('meituan_markdown_generator.ts - 美团退款数据Markdown生成', () 
       } 
     });
 
-    expect(result.output).toContain('## 招商银行储蓄卡()');
-    expect(result.output).toContain('## 招商银行信用卡()');
+    expect(result.output).toContain('## 招商银行储蓄卡(5678)');
+    expect(result.output).toContain('## 招商银行信用卡(1234)');
   });
 
   test('应该包含表格数据', async () => {

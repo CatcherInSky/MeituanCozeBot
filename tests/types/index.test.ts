@@ -7,7 +7,7 @@ import {
   getPaymentAmount,
   getPaymentTime,
 } from '../../script/final';
-import { wechatTestData, cmbDebitCardTestData } from '../testData';
+import { wechatTestData, cmbDebitCardTestData, alipayTestData } from '../testData';
 import { PaymentData } from '../../types';
 
 describe('script/final.ts - 类型守卫和工具函数', () => {
@@ -30,7 +30,13 @@ describe('script/final.ts - 类型守卫和工具函数', () => {
 
     test('isCmbCreditCardPayment 应该正确识别招商银行信用卡数据', () => {
       const cmbCreditData = {
-        ...cmbDebitCardTestData[0],
+        交易日: '06/18',
+        记账日: '06/19',
+        交易摘要: '美团支付-美团App咖啡',
+        人民币金额: '-2.66',
+        卡号末四位: '1234',
+        交易地金额: '-2.66(CN)',
+        类型: '退款',
         数据来源: '招商银行信用卡',
       };
       expect(isCmbCreditCardPayment(cmbCreditData)).toBe(true);
@@ -40,10 +46,7 @@ describe('script/final.ts - 类型守卫和工具函数', () => {
     });
 
     test('isAlipayPayment 应该正确识别支付宝数据', () => {
-      const alipayData = {
-        ...wechatTestData[0],
-        数据来源: '支付宝',
-      };
+      const alipayData = alipayTestData[0];
       expect(isAlipayPayment(alipayData)).toBe(true);
       expect(isWechatPayment(alipayData)).toBe(false);
       expect(isCmbDebitCardPayment(alipayData)).toBe(false);

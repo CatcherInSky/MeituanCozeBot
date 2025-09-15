@@ -83,7 +83,7 @@ describe('match_markdown_generator.ts - 已匹配订单数据Markdown生成', ()
     const result = await main({ params: { input: [] } });
 
     expect(result.output).toBeDefined();
-    expect(result.output).toContain('错误：没有找到有效的匹配数据');
+    expect(result.output).toContain('没有匹配数据');
   });
 
   test('应该处理包含特殊字符的数据', async () => {

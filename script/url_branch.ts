@@ -11,7 +11,7 @@ type Output = UrlBranchOutput;
 
 
 
- type PaymentChannel = '微信支付' | '招商银行储蓄卡' | '招商银行信用卡' | '支付宝' | '广发银行信用卡';
+ type PaymentChannel = '美团' | '微信支付' | '招商银行储蓄卡' | '招商银行信用卡' | '支付宝' | '广发银行信用卡';
 /**
  * 从URL中提取文件名
  * @param url 文件URL
@@ -26,7 +26,15 @@ type Output = UrlBranchOutput;
     }
     return '';
   } catch (error) {
-    console.error('URL解析错误:', error);
+    // 如果URL解析失败，尝试从输入中直接提取文件名
+    const match = url.match(/x-wf-file_name=([^&]+)/);
+    if (match) {
+      try {
+        return decodeURIComponent(match[1]);
+      } catch (decodeError) {
+        return match[1]; // 如果解码失败，返回原始字符串
+      }
+    }
     return '';
   }
 }
@@ -41,33 +49,53 @@ type Output = UrlBranchOutput;
 
   const lowerFileName = fileName.toLowerCase();
 
-  // 微信支付：文件名包含"微信支付"
-  if (lowerFileName.includes('微信支付')) {
+  // 美团：文件名包含"美团"
+  if (lowerFileName.includes('美团')) {
+    return '美团';
+  }
+
+  // 微信支付：文件名包含"微信支付"或"wechat"
+  if (lowerFileName.includes('微信支付') || lowerFileName.includes('wechat')) {
     return '微信支付';
   }
 
   // 支付宝：文件名包含"支付宝"或"alipay"
-  if (lowerFileName.includes('支付宝')) {
+  if (lowerFileName.includes('支付宝') || lowerFileName.includes('alipay')) {
     return '支付宝';
   }
 
-  // 招商银行储蓄卡：文件名包含"招商银行交易流水"
-  if (lowerFileName.includes('招商银行')) {
+  // 广发银行信用卡：文件名格式为"X年X月综合对账单打印版"
+  if (lowerFileName.includes('综合对账单打印版') || 
+      (lowerFileName.includes('广发') && lowerFileName.includes('信用卡'))) {
+    return '广发银行信用卡';
+  }
+
+  // 招商银行优先级处理：储蓄卡优先级更高
+  if (lowerFileName.includes('招商银行') || lowerFileName.includes('招商')) {
+    // 如果同时包含储蓄卡和信用卡关键词，优先返回储蓄卡
+    if (lowerFileName.includes('储蓄卡')) {
+      return '招商银行储蓄卡';
+    }
+    // 如果包含信用卡账单特征
+    if (lowerFileName.includes('信用卡账单') || lowerFileName.includes('信用卡')) {
+      return '招商银行信用卡';
+    }
+    // 如果包含交易流水特征
+    if (lowerFileName.includes('交易流水')) {
+      return '招商银行储蓄卡';
+    }
+    // 默认为储蓄卡（优先级更高）
     return '招商银行储蓄卡';
   }
 
-  // 招商银行信用卡：文件名包含"信用卡账单"或"信用卡"且包含年月格式
-  if (
-    lowerFileName.includes('信用卡账单')
-  ) {
+  // 独立检查信用卡（不包含招商银行关键词的情况）
+  if (lowerFileName.includes('信用卡账单') || lowerFileName.includes('信用卡')) {
     return '招商银行信用卡';
   }
 
-  // todo 新增
-
-  // 其他招商银行相关文件，默认为储蓄卡
-  if (lowerFileName.includes('综合对账单打印版')) {
-    return '广发银行信用卡';
+  // 独立检查储蓄卡（不包含招商银行关键词的情况）
+  if (lowerFileName.includes('交易流水') || lowerFileName.includes('储蓄卡')) {
+    return '招商银行储蓄卡';
   }
 
   return ''; // 默认返回
@@ -81,6 +109,13 @@ type Output = UrlBranchOutput;
 async function main({ params }: Args): Promise<Output> {
   const { input: url } = params;
 
+  // 处理null或无效输入
+  if (!url || typeof url !== 'string') {
+    return {
+      output: '',
+    };
+  }
+
   try {
     const fileName = extractFileName(url);
 
@@ -89,7 +124,7 @@ async function main({ params }: Args): Promise<Output> {
     };
   } catch (error) {
     return {
-      output: '微信支付', // 默认返回
+      output: '',
     };
   }
 }

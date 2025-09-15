@@ -10,6 +10,7 @@ import {
   WechatPayment,
   CmbDebitCardPayment,
   CmbCreditCardPayment,
+  GfCreditCardPayment,
   AlipayPayment,
 } from '../types';
 
@@ -41,24 +42,40 @@ function isCmbDebitCardPayment(data: PaymentData): data is CmbDebitCardPayment {
  * 类型守卫函数：检查是否为招商银行信用卡数据
  */
 function isCmbCreditCardPayment(data: PaymentData): data is CmbCreditCardPayment {
-  return '记账日期' in data && '交易金额' in data && data.数据来源 === '招商银行信用卡';
+  return '记账日' in data && '人民币金额' in data && data.数据来源 === '招商银行信用卡';
+}
+
+/**
+ * 类型守卫函数：检查是否为广发银行信用卡数据
+ */
+function isGfCreditCardPayment(data: PaymentData): data is GfCreditCardPayment {
+  return '交易日期' in data && '交易金额' in data && data.数据来源 === '广发银行信用卡';
 }
 
 /**
  * 类型守卫函数：检查是否为支付宝数据
  */
 function isAlipayPayment(data: PaymentData): data is AlipayPayment {
-  return '交易时间' in data && '金额(元)' in data && data.数据来源 === '支付宝';
+  return '交易时间' in data && '金额' in data && data.数据来源 === '支付宝';
 }
 
 /**
  * 获取支付数据的金额字段
  */
 function getPaymentAmount(data: PaymentData): string {
-  if (isWechatPayment(data) || isAlipayPayment(data)) {
+  if (isWechatPayment(data)) {
     return data['金额(元)'];
   }
-  if (isCmbDebitCardPayment(data) || isCmbCreditCardPayment(data)) {
+  if (isAlipayPayment(data)) {
+    return data.金额;
+  }
+  if (isCmbDebitCardPayment(data)) {
+    return data.交易金额;
+  }
+  if (isCmbCreditCardPayment(data)) {
+    return data.人民币金额;
+  }
+  if (isGfCreditCardPayment(data)) {
     return data.交易金额;
   }
   return '';
@@ -71,8 +88,14 @@ function getPaymentTime(data: PaymentData): string {
   if (isWechatPayment(data) || isAlipayPayment(data)) {
     return data.交易时间;
   }
-  if (isCmbDebitCardPayment(data) || isCmbCreditCardPayment(data)) {
+  if (isCmbDebitCardPayment(data)) {
     return data.记账日期;
+  }
+  if (isCmbCreditCardPayment(data)) {
+    return data.记账日;
+  }
+  if (isGfCreditCardPayment(data)) {
+    return data.交易日期;
   }
   return '';
 }
@@ -272,7 +295,7 @@ function isOrderMatchPaymentData(
 
       // 商户单号匹配
       if (isAlipayPayment(paymentData)) {
-        const alipayMerchantId = paymentData.商户单号 || '';
+        const alipayMerchantId = paymentData.商家订单号 || '';
         const meituanMerchantId = meituanOrder.商家单号 || '';
         
         if (alipayMerchantId.includes(meituanMerchantId) || meituanMerchantId.includes(alipayMerchantId)) {
@@ -392,6 +415,7 @@ export {
   isWechatPayment,
   isCmbDebitCardPayment,
   isCmbCreditCardPayment,
+  isGfCreditCardPayment,
   isAlipayPayment,
   getPaymentAmount,
   getPaymentTime,
