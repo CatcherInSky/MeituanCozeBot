@@ -23,8 +23,8 @@ describe('uncover_markdown_generator.ts - 未覆盖订单数据Markdown生成', 
     const input = meituanTestData;
     const result = await main({ params: { input } });
 
-    expect(result.output).toContain('## 招商银行储蓄卡()');
-    expect(result.output).toContain('## 招商银行信用卡()');
+    expect(result.output).toContain('## 招商银行储蓄卡(5678)');
+    expect(result.output).toContain('## 招商银行信用卡(1234)');
   });
 
   test('应该包含表格数据', async () => {
@@ -114,7 +114,7 @@ describe('uncover_markdown_generator.ts - 未覆盖订单数据Markdown生成', 
     expect(result.output).toBeDefined();
     expect(result.output).toContain('# 时间或支付方式未覆盖退款数据详情');
     // 应该只包含有效数据
-    expect(result.output).toContain('招商银行储蓄卡()');
+    expect(result.output).toContain('招商银行储蓄卡(5678)');
   });
 
   test('应该处理单个订单数据', async () => {
@@ -123,7 +123,7 @@ describe('uncover_markdown_generator.ts - 未覆盖订单数据Markdown生成', 
 
     expect(result.output).toBeDefined();
     expect(result.output).toContain('# 时间或支付方式未覆盖退款数据详情');
-    expect(result.output).toContain('## 招商银行储蓄卡()');
+    expect(result.output).toContain('## 招商银行信用卡(1234)');
   });
 
   test('应该处理相同支付方式的多个订单', async () => {
@@ -134,10 +134,10 @@ describe('uncover_markdown_generator.ts - 未覆盖订单数据Markdown生成', 
     const result = await main({ params: { input } });
 
     expect(result.output).toBeDefined();
-    expect(result.output).toContain('## 招商银行储蓄卡()');
+    expect(result.output).toContain('## 招商银行信用卡(1234)');
     // 应该包含两个订单
     const lines = result.output.split('\u000A');
-    const dataLines = lines.filter((line: string) => line.includes('420000') || line.includes('different'));
+    const dataLines = lines.filter((line: string) => line.includes('TEST001001001001001') || line.includes('different'));
     expect(dataLines).toHaveLength(2);
   });
 
