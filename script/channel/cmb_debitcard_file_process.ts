@@ -31,11 +31,27 @@ async function main({ params }: Args): Promise<Output> {
     dateRange = [startDateTime, endDateTime];
   }
 
+  // 根据规则：从验证码(Verification Code)之后开始解析
+  let dataStartIndex = -1;
+  const lines = cleanedInput.split('\n');
+  
+  // 查找验证码标识，确定数据解析起点
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (line.includes('验证码') || line.includes('Verification Code')) {
+      dataStartIndex = i + 1; // 从验证码下一行开始
+      break;
+    }
+  }
+
+  // 如果没有找到验证码标识，使用原有逻辑作为备选
+  if (dataStartIndex === -1) {
+    dataStartIndex = 0;
+  }
+
   // 根据规则优化：每行数据都是日期开始 YYYY-MM-DD
   // 货币列都是英文，紧跟着交易金额和联机余额都是小数点后两位的数字
-  const lines = cleanedInput.split('\n');
-
-  for (let i = 0; i < lines.length; i++) {
+  for (let i = dataStartIndex; i < lines.length; i++) {
     const line = lines[i].trim();
 
     // 跳过表头行和空行

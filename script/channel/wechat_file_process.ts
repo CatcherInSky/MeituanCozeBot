@@ -26,6 +26,7 @@ async function main({ params }: Args): Promise<Output> {
 
   const transactions: any[] = [];
   let dateRange: string[] = [];
+  let foundDataStart = false;
 
   // 遍历解析后的数据，提取交易记录和日期范围
   for (const item of parsedData) {
@@ -40,10 +41,22 @@ async function main({ params }: Args): Promise<Output> {
       if (startTimeMatch && endTimeMatch) {
         dateRange = [startTimeMatch[1], endTimeMatch[1]];
       }
+      continue;
+    }
+
+    // 检查是否找到微信支付账单明细列表分隔线标识
+    if (wechatField && wechatField.includes('----------------------微信支付账单明细列表--------------------')) {
+      foundDataStart = true;
+      continue;
     }
 
     // 检查是否包含交易时间（格式：YYYY-MM-DD HH:mm:ss）
     const timePattern = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
+
+    // 只有在找到数据开始标识后才开始处理交易记录
+    if (!foundDataStart) {
+      continue;
+    }
 
     // 跳过标题行、统计信息和空行
     if (

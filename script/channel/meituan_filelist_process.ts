@@ -12,6 +12,8 @@ async function main({ params }: Args): Promise<Output> {
   // 用于去重的Map，键为交易单号，值为清理后的交易数据
   const uniqueTransactions = new Map<string, any>();
   const timePattern = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
+  let dateRange: string[] = [];
+  let foundDataStart = false;
 
   // 单次循环完成：解析JSON、提取交易记录、去重、数据清理
   for (const jsonString of input) {
@@ -24,8 +26,25 @@ async function main({ params }: Args): Promise<Output> {
         const keys = Object.keys(item);
         const meituanKey = keys.find(key => key.includes('美团交易账单明细'));
 
-        // 查找包含交易数据的对象 - 同时有美团交易账单明细和null字段
+        // 首先检查是否找到【美团交易账单明细列表】标识
+        if (meituanKey && item[meituanKey] && item[meituanKey].includes('【美团交易账单明细列表】')) {
+          foundDataStart = true;
+          continue;
+        }
+
+        // 提取日期范围信息
+        if (meituanKey && item[meituanKey] && item[meituanKey].includes('起始时间：') && item[meituanKey].includes('终止时间：')) {
+          const content = item[meituanKey];
+          const dateMatch = content.match(/起始时间：\[([^\]]+)\]\s+终止时间：\[([^\]]+)\]/);
+          if (dateMatch) {
+            dateRange = [dateMatch[1] + ' 00:00:00', dateMatch[2] + ' 23:59:59'];
+          }
+          continue;
+        }
+
+        // 查找包含交易数据的对象 - 同时有美团交易账单明细和null字段，且已找到数据开始标识
         if (
+          foundDataStart &&
           meituanKey &&
           item[meituanKey] &&
           item.null &&
@@ -82,7 +101,9 @@ async function main({ params }: Args): Promise<Output> {
     })
     .filter(item => item.交易类型 === '退款');
 
-  return { output };
+  return { 
+    output: output
+  };
 }
 
 export default main;
