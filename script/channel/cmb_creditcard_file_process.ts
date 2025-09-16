@@ -4,6 +4,29 @@ import { CmbCreditCardPayment, ChannelProcessOutput, FunctionArgs } from '../../
 type Args = FunctionArgs<{ input: string }>;
 type Output = ChannelProcessOutput<CmbCreditCardPayment>;
 
+/**
+ * 将月日格式转换为完整日期格式，处理跨年情况
+ * @param monthDay MM/DD格式的日期
+ * @param billYear 账单年份
+ * @param billMonth 账单月份
+ * @returns YYYY/MM/DD格式的完整日期
+ */
+function convertMonthDayToFullDate(monthDay: string, billYear: string, billMonth: string): string {
+  const [month, day] = monthDay.split('/');
+  const transactionMonth = parseInt(month);
+  const billMonthNum = parseInt(billMonth);
+  const billYearNum = parseInt(billYear);
+  
+  // 判断年份：如果交易月份大于账单月份，说明是上一年
+  // 例如：账单是2025年8月，交易是12月，说明交易是2024年12月
+  let year = billYearNum;
+  if (transactionMonth > billMonthNum) {
+    year = billYearNum - 1;
+  }
+  
+  return `${year}/${month}/${day}`;
+}
+
 async function main({ params }: Args): Promise<Output> {
   const { input } = params;
 
@@ -19,16 +42,20 @@ async function main({ params }: Args): Promise<Output> {
   // 查找账单日期：账单日下一行的日期
   const billDateMatch = cleanedInput.match(/账单日\s*\n\s*(\d{4})年(\d{2})月(\d{2})日/);
   
+  let billYear = '';
+  let billMonth = '';
+  let billDay = '';
+  
   if (billDateMatch) {
-    const year = billDateMatch[1];
-    const month = billDateMatch[2];
-    const day = billDateMatch[3];
+    billYear = billDateMatch[1];
+    billMonth = billDateMatch[2];
+    billDay = billDateMatch[3];
     
     // 账单日作为结束日期
-    const endDate = `${year}-${month}-${day} 23:59:59`;
+    const endDate = `${billYear}-${billMonth}-${billDay} 23:59:59`;
     
     // 开始日期往前推一个月
-    const endDateObj = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    const endDateObj = new Date(parseInt(billYear), parseInt(billMonth) - 1, parseInt(billDay));
     const startDateObj = new Date(endDateObj.getFullYear(), endDateObj.getMonth() - 1, endDateObj.getDate());
     const startDate = `${startDateObj.getFullYear()}-${String(startDateObj.getMonth() + 1).padStart(2, '0')}-${String(startDateObj.getDate()).padStart(2, '0')} 00:00:00`;
     
@@ -114,6 +141,14 @@ async function main({ params }: Args): Promise<Output> {
       const postingDate = dateMatch[2]; // MM/DD
       const remainingContent = dateMatch[3];
       
+      // 转换为完整日期格式，处理跨年情况
+      const fullTransactionDate = billYear && billMonth ? 
+        convertMonthDayToFullDate(transactionDate, billYear, billMonth) : 
+        transactionDate;
+      const fullPostingDate = billYear && billMonth ? 
+        convertMonthDayToFullDate(postingDate, billYear, billMonth) : 
+        postingDate;
+      
       // 解析金额和卡号末四位：寻找数字+卡号+金额的模式
       // 示例：财付通-测试造型店18.54562518.54(CN)
       // 或者：预约还款-585.835625-585.83
@@ -139,6 +174,7 @@ async function main({ params }: Args): Promise<Output> {
           const transaction: CmbCreditCardPayment = {
             交易日: transactionDate,
             记账日: postingDate,
+            日期: fullTransactionDate,
             交易摘要: summary,
             人民币金额: amount,
             卡号末四位: '',
@@ -161,6 +197,7 @@ async function main({ params }: Args): Promise<Output> {
       const transaction: CmbCreditCardPayment = {
         交易日: transactionDate,
         记账日: postingDate,
+        日期: fullTransactionDate,
         交易摘要: summary,
         人民币金额: firstAmount,
         卡号末四位: cardLast4,

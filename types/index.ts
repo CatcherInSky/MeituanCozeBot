@@ -55,6 +55,7 @@ export interface CmbDebitCardPayment {
 export interface CmbCreditCardPayment {
   交易日: string;
   记账日: string;
+  日期: string; // YYYY/MM/DD格式，用于跨年对账
   交易摘要: string;
   人民币金额: string;
   卡号末四位: string;
