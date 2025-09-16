@@ -35,12 +35,13 @@ async function main({ params }: Args): Promise<Output> {
     dateRange = [startDate, endDate];
   }
 
-  // 查找数据解析范围：从"人民币账户 RMB A/C"到"本期还款总额"
-  const startMarker = '人民币账户 RMB A/C';
+  // 查找数据解析范围：从"本期账务明细 Transaction Details"到第二个"本期还款总额"
+  const startMarker = '本期账务明细 Transaction Details';
   const endMarker = '本期还款总额';
   
   const startIndex = cleanedInput.indexOf(startMarker);
-  const endIndex = cleanedInput.indexOf(endMarker);
+  const firstEndIndex = cleanedInput.indexOf(endMarker);
+  const endIndex = cleanedInput.indexOf(endMarker, firstEndIndex + 1); // 查找第二个"本期还款总额"
   
   if (startIndex === -1 || endIndex === -1 || startIndex >= endIndex) {
     console.warn('Could not find data boundaries in CMB credit card statement');
@@ -63,7 +64,8 @@ async function main({ params }: Args): Promise<Output> {
   let dataStartIndex = -1;
   for (let i = 0; i < lines.length; i++) {
     if (lines[i].includes('SOLDPOSTEDDESCRIPTION') || 
-        lines[i].includes('交易日记账日交易摘要')) {
+        lines[i].includes('交易日记账日交易摘要') ||
+        lines[i].includes('人民币账户 RMB A/C')) {
       dataStartIndex = i + 1;
       break;
     }
@@ -102,7 +104,7 @@ async function main({ params }: Args): Promise<Output> {
     try {
       // 招商银行信用卡数据特点：一行拼接格式
       // 交易日/记账日：MM/DD格式，金额：两位小数，可能包含(CN)标识
-      // 示例：06/18 06/19 美团支付-美团App库迪咖啡-2.661234-2.66(CN)
+      // 示例：07/28 07/29 财付通-广州教育物业管理有限公司155366.801234366.80(CN)
       
       // 解析交易日和记账日 (MM/DD格式)
       const dateMatch = line.match(/^(\d{2}\/\d{2})\s+(\d{2}\/\d{2})\s+(.+)/);
@@ -113,9 +115,19 @@ async function main({ params }: Args): Promise<Output> {
       const remainingContent = dateMatch[3];
       
       // 解析金额和卡号末四位：寻找数字+卡号+金额的模式
-      // 示例：美团支付-美团App库迪咖啡-2.661234-2.66(CN)
-      // 或者：预约还款-1,086.595625-1,086.59
-      const amountMatch = remainingContent.match(/(.+?)(-?\d+(?:,\d{3})*\.?\d*)(\d{4})(-?\d+(?:,\d{3})*\.?\d*)(\([^)]*\))?$/);
+      // 示例：财付通-测试造型店18.54562518.54(CN)
+      // 或者：预约还款-585.835625-585.83
+      // 特殊格式：财付通-测试物业管理公司155366.805625366.80(CN)
+      
+      // 使用精确的正则匹配策略
+      // 格式：摘要+（带符号）精确到两位小数数字+4位数字（卡号）+（带符号）精确到两位小数数字+位置信息
+      // 示例：财付通-测试造型店18.54123418.54(CN)
+      let amountMatch = remainingContent.match(/(.+?)(-?\d+(?:,\d{3})*\.\d{2})(\d{4})(-?\d+(?:,\d{3})*\.\d{2})(\([^)]*\))?$/);
+      
+      // 如果没有匹配到，尝试匹配没有位置信息的情况
+      if (!amountMatch) {
+        amountMatch = remainingContent.match(/(.+?)(-?\d+(?:,\d{3})*\.\d{2})(\d{4})(-?\d+(?:,\d{3})*\.\d{2})$/);
+      }
       
       if (!amountMatch) {
         // 尝试另一种格式：没有卡号的情况

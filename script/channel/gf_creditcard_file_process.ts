@@ -26,8 +26,8 @@ async function main({ params }: Args): Promise<Output> {
     dateRange = [startDate, endDate];
   }
 
-  // 查找数据解析范围：从"注：若您名下的多张信用卡主卡均有欠款，需分别还款"到"用卡安全温馨提示："
-  const startMarker = '注：若您名下的多张信用卡主卡均有欠款，需分别还款';
+  // 查找数据解析范围：从第一个表头到"用卡安全温馨提示："
+  const startMarker = '交易日期入账日期交易摘要交易金额交易货币入账金额入账货币';
   const endMarker = '用卡安全温馨提示：';
   
   const startIndex = cleanedInput.indexOf(startMarker);
@@ -50,17 +50,43 @@ async function main({ params }: Args): Promise<Output> {
   // 按行分割数据
   const lines = dataSection.split('\n').filter(line => line.trim());
   
-  // 查找表头行：交易日期入账日期交易摘要交易金额交易货币入账金额入账货币
-  let headerIndex = -1;
+  // 查找所有表头位置：交易日期入账日期交易摘要交易金额交易货币入账金额入账货币
+  const headerIndices: number[] = [];
   for (let i = 0; i < lines.length; i++) {
     if (lines[i].includes('交易日期') && lines[i].includes('入账日期') && 
         lines[i].includes('交易摘要') && lines[i].includes('交易金额')) {
-      headerIndex = i;
-      break;
+      headerIndices.push(i);
+    }
+  }
+  
+  // 如果没找到表头，尝试更宽松的查找条件
+  if (headerIndices.length === 0) {
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].includes('交易日期') && lines[i].includes('交易金额')) {
+        headerIndices.push(i);
+      }
+    }
+  }
+  
+  // 查找分页标识位置
+  const pageIndices: number[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].match(/^\d+\/3$/)) {
+      pageIndices.push(i);
+    }
+  }
+  
+  // 如果没找到表头，尝试查找卡号行作为数据开始位置
+  if (headerIndices.length === 0) {
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].includes('卡号：')) {
+        headerIndices.push(i);
+        break;
+      }
     }
   }
 
-  if (headerIndex === -1) {
+  if (headerIndices.length === 0) {
     console.warn('Could not find header in GF credit card data');
     return {
       output: {
@@ -71,63 +97,88 @@ async function main({ params }: Args): Promise<Output> {
     };
   }
 
-  // 解析交易数据（表头后的数据）
-  for (let i = headerIndex + 1; i < lines.length; i++) {
-    const line = lines[i].trim();
+  // 解析交易数据（所有表头后的数据）
+  // 广发银行数据格式：每3行为一组交易记录
+  // 第1行：交易日期+入账日期
+  // 第2行：交易类型+交易摘要
+  // 第3行：交易金额+货币+入账金额+货币
+  
+  // 处理每个表头区域的数据
+  for (let headerIdx = 0; headerIdx < headerIndices.length; headerIdx++) {
+    const headerIndex = headerIndices[headerIdx];
     
-    // 跳过空行和非交易数据行
-    if (!line || line.includes('卡号：') || line.includes('交易明细') || 
-        line.length < 20) {
-      continue;
+    // 计算当前表头区域的结束位置
+    let endIndex: number;
+    
+    if (headerIdx < headerIndices.length - 1) {
+      // 不是最后一个表头，结束位置是下一个表头
+      endIndex = headerIndices[headerIdx + 1];
+    } else {
+      // 最后一个表头，结束位置是数据结束
+      endIndex = lines.length;
     }
+    
+    // 第一个表头区域需要特殊处理，跳过标题行
+    let startLine = headerIndex + 1;
+    if (headerIdx === 0) {
+      // 跳过第一个表头区域的标题行
+      while (startLine < endIndex && 
+             (lines[startLine].includes('交易明细') || 
+              lines[startLine].includes('卡号：'))) {
+        startLine++;
+      }
+    }
+    
+    for (let i = startLine; i < endIndex - 2; i += 3) {
+      try {
+        const dateLine = lines[i].trim();
+        const summaryLine = lines[i + 1]?.trim() || '';
+        const amountLine = lines[i + 2]?.trim() || '';
+        
+        // 跳过空行和非交易数据行
+        if (!dateLine || !summaryLine || !amountLine || 
+            dateLine.includes('卡号：') || dateLine.includes('交易明细') ||
+            summaryLine.includes('交易明细') || summaryLine.includes('卡号：') ||
+            amountLine.includes('交易明细') || amountLine.includes('卡号：')) {
+          continue;
+        }
 
-    try {
-      // 广发银行信用卡数据特点：一行拼接，日期YYYY/MM/DD格式，金额两位小数
-      // 示例：2024/02/242024/02/25(消费)（特约）美团46.00 人民币46.00 人民币
-      
-      // 尝试解析交易日期和入账日期 (YYYY/MM/DD格式)
-      const dateMatch = line.match(/^(\d{4}\/\d{2}\/\d{2})(\d{4}\/\d{2}\/\d{2})/);
-      if (!dateMatch) continue;
-      
-      const transactionDate = dateMatch[1];
-      const postingDate = dateMatch[2];
-      
-      // 移除日期部分，获取剩余内容
-      const remainingContent = line.substring(dateMatch[0].length);
-      
-      // 解析交易类型（消费）、（退货）等
-      const typeMatch = remainingContent.match(/^\s*\(([^)]+)\)/);
-      if (!typeMatch) continue;
-      
-      const transactionType = typeMatch[1];
-      
-      // 移除交易类型，获取剩余内容
-      const afterType = remainingContent.substring(typeMatch[0].length);
-      
-      // 解析金额：找到最后的金额模式 "数字.数字 人民币数字.数字 人民币"
-      const amountMatch = afterType.match(/(-?\d+\.?\d*)\s*人民币(-?\d+\.?\d*)\s*人民币\s*$/);
-      if (!amountMatch) continue;
-      
-      const transactionAmount = amountMatch[1];
-      const postingAmount = amountMatch[2];
-      
-      // 提取交易摘要（去除金额部分）
-      const summaryPart = afterType.substring(0, afterType.lastIndexOf(amountMatch[0])).trim();
-      
-      const transaction: GfCreditCardPayment = {
-        交易日期: transactionDate,
-        入账日期: postingDate,
-        交易摘要: `(${transactionType})${summaryPart}`,
-        交易金额: transactionAmount,
-        交易货币: '人民币',
-        入账金额: postingAmount,
-        入账货币: '人民币',
-        数据来源: '广发银行信用卡',
-      };
+        // 解析交易日期和入账日期 (YYYY/MM/DD格式)
+        const dateMatch = dateLine.match(/^(\d{4}\/\d{2}\/\d{2})(\d{4}\/\d{2}\/\d{2})/);
+        if (!dateMatch) continue;
+        
+        const transactionDate = dateMatch[1];
+        const postingDate = dateMatch[2];
+        
+        // 解析交易类型和摘要
+        const typeMatch = summaryLine.match(/^\(([^)]+)\)(.+)/);
+        if (!typeMatch) continue;
+        
+        const transactionType = typeMatch[1];
+        const summary = typeMatch[2].trim();
+        
+        // 解析金额：格式如 "8.49 人民币8.49 人民币"
+        const amountMatch = amountLine.match(/(-?\d+\.?\d*)\s*人民币(-?\d+\.?\d*)\s*人民币/);
+        if (!amountMatch) continue;
+        
+        const transactionAmount = amountMatch[1];
+        const postingAmount = amountMatch[2];
+        
+        const transaction: GfCreditCardPayment = {
+          交易日期: transactionDate,
+          入账日期: postingDate,
+          交易摘要: `(${transactionType})${summary}`,
+          交易金额: transactionAmount,
+          交易货币: '人民币',
+          入账金额: postingAmount,
+          入账货币: '人民币',
+          数据来源: '广发银行信用卡',
+        };
 
-      transactions.push(transaction);
-    } catch (error) {
-      console.warn('Error parsing GF credit card transaction:', error, line);
+        transactions.push(transaction);
+      } catch (error) {
+        console.warn('Error parsing GF credit card transaction:', error, lines[i]);
+      }
     }
   }
 

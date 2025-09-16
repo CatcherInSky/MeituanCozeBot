@@ -17,7 +17,7 @@ describe('alipay_file_process.ts - 支付宝数据处理', () => {
     const firstTransaction = result.output.data[0];
     expect(firstTransaction.交易时间).toBe('2025-09-11 15:17:22');
     expect(firstTransaction.交易分类).toBe('餐饮美食');
-    expect(firstTransaction.交易对方).toBe('广州盒马');
+    expect(firstTransaction.交易对方).toBe('测试超市');
     expect(firstTransaction.金额).toBe('36.06');
     expect(firstTransaction['收/支']).toBe('支出');
     expect(firstTransaction.数据来源).toBe('支付宝');
