@@ -51,6 +51,7 @@ describe('cmb_creditcard_file_process.ts - 招商银行信用卡数据处理', (
      消费
      07/16 07/17 美团支付-美团App奈雪的茶8.5712348.57(CN)
     本期还款总额
+    本期还款总额
     `;
 
     const result = await main({

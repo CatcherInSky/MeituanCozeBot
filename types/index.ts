@@ -68,6 +68,7 @@ export interface GfCreditCardPayment {
   交易日期: string;
   入账日期: string;
   交易摘要: string;
+  类型: string; // 从交易摘要中提取的类型，如"消费"、"退货"等
   交易金额: string;
   交易货币: string;
   入账金额: string;

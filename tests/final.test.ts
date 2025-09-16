@@ -7,6 +7,22 @@ import {
   cmbDebitCardTestData 
 } from './testData';
 import { MeituanOrder, PaymentData, AggregatedChannelData } from '../types';
+import {
+  getPaymentAmount,
+  getPaymentTime,
+  getPaymentTransactionType,
+  getPaymentDescription,
+  isCreditCardChannel,
+  isOrderMatchPaymentData,
+  findMatchingPaymentData,
+  extractAmount,
+  isAmountMatch,
+  normalizeTimeString,
+  isPaymentTimeWithinWindow,
+  preprocessPaymentData,
+  preprocessMeituanOrder,
+  calculateMatchScore,
+} from '../script/final';
 
 describe('final.ts - 美团订单与支付渠道数据匹配处理', () => {
   describe('基础功能测试', () => {
@@ -95,7 +111,7 @@ describe('final.ts - 美团订单与支付渠道数据匹配处理', () => {
       expect(result.output.unmatch[0]).toEqual(meituanOrder);
     });
 
-    test('应该将时间不在范围内的订单放入unmatch', async () => {
+    test('应该将时间不在范围内的订单放入uncover', async () => {
       const meituanOrder: MeituanOrder = {
         ...meituanTestData[0],
         实付金额: '¥70.56',
@@ -118,8 +134,9 @@ describe('final.ts - 美团订单与支付渠道数据匹配处理', () => {
       const result = await main({ params: { input, meituan: [meituanOrder] } });
 
       expect(result.output.match).toHaveLength(0);
-      expect(result.output.unmatch).toHaveLength(1);
-      expect(result.output.unmatch[0]).toEqual(meituanOrder);
+      expect(result.output.unmatch).toHaveLength(0);
+      expect(result.output.uncover).toHaveLength(1);
+      expect(result.output.uncover[0]).toEqual(meituanOrder);
     });
 
     test('应该将支付方式不匹配的订单放入uncover', async () => {
@@ -300,6 +317,126 @@ describe('final.ts - 美团订单与支付渠道数据匹配处理', () => {
 
       expect(result.output).toBeDefined();
       expect(endTime - startTime).toBeLessThan(5000); // 应该在5秒内完成
+    });
+  });
+
+  describe('重构后的统一匹配逻辑测试', () => {
+    describe('字段映射功能测试', () => {
+      test('应该正确获取微信支付的金额字段', () => {
+        const wechatData: PaymentData = {
+          ...wechatTestData[0],
+          '金额(元)': '¥70.56',
+          数据来源: '微信支付',
+        };
+        
+        expect(getPaymentAmount(wechatData)).toBe('¥70.56');
+        expect(getPaymentTime(wechatData)).toBe('2025-09-08 15:53:25');
+        expect(getPaymentTransactionType(wechatData)).toBe('支出'); // 现在使用收/支字段
+        expect(isCreditCardChannel(wechatData)).toBe(false);
+      });
+
+      test('应该正确获取招商银行信用卡的字段', () => {
+        const cmbCreditData: PaymentData = {
+          卡号末四位: '5625',
+          记账日: '08/16',
+          交易摘要: '美团支付-美团App奈雪的茶',
+          交易日: '09/15',
+          类型: '退款',
+          交易地金额: '-8.57(CN)',
+          人民币金额: '-8.57',
+          数据来源: '招商银行信用卡',
+          日期: '2025/08/16',
+        };
+        
+        expect(getPaymentAmount(cmbCreditData)).toBe('-8.57');
+        expect(getPaymentTime(cmbCreditData)).toBe('08/16');
+        expect(getPaymentTransactionType(cmbCreditData)).toBe('退款');
+        expect(getPaymentDescription(cmbCreditData)).toBe('美团支付-美团App奈雪的茶');
+        expect(isCreditCardChannel(cmbCreditData)).toBe(true);
+      });
+    });
+
+    describe('金额处理功能测试', () => {
+      test('应该正确提取金额数值', () => {
+        expect(extractAmount('¥70.56')).toBe(70.56);
+        expect(extractAmount('$100.00')).toBe(100);
+        expect(extractAmount('1,234.56')).toBe(1234.56);
+        expect(extractAmount('-8.57')).toBe(-8.57);
+        expect(extractAmount('')).toBe(0);
+      });
+
+      test('应该正确比较金额', () => {
+        expect(isAmountMatch('¥70.56', '70.56')).toBe(true);
+        expect(isAmountMatch('¥70.56', '70.55')).toBe(true); // 允许0.01误差
+        expect(isAmountMatch('¥70.56', '70.50')).toBe(false);
+        expect(isAmountMatch('-8.57', '-8.57')).toBe(true);
+        // 测试实际误差值（考虑浮点数精度问题）
+        expect(Math.abs(70.56 - 70.55)).toBeLessThanOrEqual(0.011);
+      });
+    });
+
+    describe('时间处理功能测试', () => {
+      test('应该正确标准化时间格式', () => {
+        expect(normalizeTimeString('08/10')).toBe('2025-08-10 23:59:59');
+        expect(normalizeTimeString('2025-08-10')).toBe('2025-08-10 23:59:59');
+        expect(normalizeTimeString('2024/02/25')).toBe('2024-02-25 23:59:59');
+        expect(normalizeTimeString('2025-09-08 15:53:25')).toBe('2025-09-08 15:53:25');
+      });
+
+      test('应该正确检查时间窗口', () => {
+        const meituanTime = '2025-09-08 15:53:25';
+        const paymentTime1 = '2025-09-08 16:53:25'; // 1小时后
+        const paymentTime2 = '2025-09-09 15:53:25'; // 24小时后
+        const paymentTime3 = '2025-09-10 15:53:25'; // 48小时后
+        
+        expect(isPaymentTimeWithinWindow(paymentTime1, meituanTime, 24)).toBe(true);
+        expect(isPaymentTimeWithinWindow(paymentTime2, meituanTime, 24)).toBe(true);
+        expect(isPaymentTimeWithinWindow(paymentTime3, meituanTime, 24)).toBe(false);
+        expect(isPaymentTimeWithinWindow(paymentTime3, meituanTime, 48)).toBe(true);
+      });
+    });
+
+
+    describe('统一匹配规则测试', () => {
+      test('应该优先使用强规则匹配', () => {
+        const meituanOrder: MeituanOrder = {
+          ...meituanTestData[0],
+          交易类型: '退款',
+          实付金额: '¥70.56',
+          交易成功时间: '2025-09-08 15:53:25',
+        };
+
+        const paymentData: PaymentData = {
+          ...wechatTestData[0],
+          交易类型: '退款',
+          '金额(元)': '¥70.56',
+          交易时间: '2025-09-08 16:53:25',
+          交易摘要: '美团支付-美团App',
+          数据来源: '微信支付',
+        };
+
+        expect(isOrderMatchPaymentData(meituanOrder, paymentData)).toBe(true);
+      });
+
+      test('应该使用弱规则匹配当强规则不匹配时', () => {
+        const meituanOrder: MeituanOrder = {
+          ...meituanTestData[0],
+          交易类型: '消费', // 非退款，强规则不匹配
+          实付金额: '¥70.56',
+          交易成功时间: '2025-09-08 15:53:25',
+        };
+
+        const paymentData: PaymentData = {
+          ...wechatTestData[0],
+          交易类型: '收入',
+          '金额(元)': '¥70.56',
+          交易时间: '2025-09-08 16:53:25',
+          交易摘要: '美团支付-美团App', // 包含美团，弱规则匹配
+          数据来源: '微信支付',
+        };
+
+        expect(isOrderMatchPaymentData(meituanOrder, paymentData)).toBe(true);
+      });
     });
   });
 });

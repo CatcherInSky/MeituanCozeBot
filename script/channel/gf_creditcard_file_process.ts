@@ -168,6 +168,7 @@ async function main({ params }: Args): Promise<Output> {
           交易日期: transactionDate,
           入账日期: postingDate,
           交易摘要: `(${transactionType})${summary}`,
+          类型: transactionType,
           交易金额: transactionAmount,
           交易货币: '人民币',
           入账金额: postingAmount,

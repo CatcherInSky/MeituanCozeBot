@@ -5,7 +5,7 @@
 	"scripts": {
 		"dev": "tsc --watch",
 		"build": "tsc && npm run clean",
-		"clean": "find dist -name '*.js' -exec sed -i '' -e 's/^\"use strict\";//g' -e '/^Object\\.defineProperty.*__esModule.*$/d' -e '/^exports\\..*$/d' -e '/^module\\.exports.*$/d' {} \\; && rm -rf dist/types",
+		"clean": "node scripts/clean-js.js && rm -rf dist/types",
 		"format": "prettier --write \"script/**/*.ts\" && eslint --fix \"script/**/*.ts\"",
 		"format:check": "prettier --check \"script/**/*.ts\" && eslint \"script/**/*.ts\"",
 		"lint": "eslint \"script/**/*.ts\"",
