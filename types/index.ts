@@ -1,29 +1,48 @@
 // 统一类型定义文件
 // 定义所有支付渠道和数据处理相关的类型
-
+// 英文key作区分为数据处理时添加的字段
 /**
  * 美团订单数据格式
  */
 export interface MeituanOrder {
   支付方式: string;
-  实付金额: string;
+  实付金额: string;// ￥\d 需要去除￥
   备注: string;
   订单标题: string;
-  交易创建时间: string;
-  交易成功时间: string;
+  交易创建时间: string; // YYYY-MM-DD HH:mm:ss
+  交易成功时间: string; // YYYY-MM-DD HH:mm:ss
   交易类型: string;
   '收/支': string;
-  订单金额: string;
+  订单金额: string;// ￥\d 需要去除￥
   交易单号: string;
   商家单号: string;
+  channel: MeituanOrder['支付方式'];
+  type: MeituanOrder['交易类型'];
+  date: number; // MeituanOrder['交易创建时间'];
+  amount: number; // MeituanOrder['实付金额'];
+  id: MeituanOrder['交易单号'];
 }
-
+export interface MeituanBalanceOCR {
+    "amount": number;
+    "type": string;
+    "name": string;
+    "date": string; // YYYY-MM-DD HH:mm:ss
+}
+// 美团余额
+export interface MeituanBalance {
+  amount: number; // +440.00 -390.03
+  type: string;
+  name: string;
+  date: number; // YYYY-MM-DD HH:mm:ss
+  channel: '美团余额';
+  id: string;
+}
 /**
  * 微信支付数据格式
  */
 export interface WechatPayment {
-  交易时间: string;
-  '金额(元)': string;
+  交易时间: string; // YYYY-MM-DD HH:mm:ss
+  '金额(元)': string; // ￥\d 需要去除￥
   支付方式: string;
   商户单号: string;
   备注: string;
@@ -33,20 +52,28 @@ export interface WechatPayment {
   商品: string;
   '收/支': string;
   交易单号: string;
-  数据来源: string;
+  channel: '微信支付';
+  date: number; // WechatPayment['交易时间'];
+  amount: number;// WechatPayment['金额(元)'];
+  type: WechatPayment['交易类型'];
+  id: WechatPayment['交易单号'];
 }
 
 /**
  * 招商银行储蓄卡数据格式
  */
 export interface CmbDebitCardPayment {
-  记账日期: string;
+  记账日期: string; // YYYY-MM-DD
   货币: string;
   交易金额: string;
   联机余额: string;
   交易摘要: string;
   对手信息: string;
-  数据来源: string;
+  channel: '招商银行储蓄卡';
+  date: number; // CmbDebitCardPayment['记账日期'];
+  amount: number; // CmbDebitCardPayment['交易金额'];
+  type: CmbDebitCardPayment['交易摘要'];
+  id: string; // CmbDebitCardPayment['记账日期'] + CmbDebitCardPayment['交易金额'] + CmbDebitCardPayment['对手信息'] + CmbDebitCardPayment['交易摘要'] + CmbDebitCardPayment['联机余额']
 }
 
 /**
@@ -54,33 +81,39 @@ export interface CmbDebitCardPayment {
  */
 export interface CmbCreditCardPayment {
   交易日: string;
-  记账日: string;
-  日期: string; // YYYY/MM/DD格式，用于跨年对账
+  记账日: string; //  MM/DD x需要拼接年份
   交易摘要: string;
   人民币金额: string;
   卡号末四位: string;
   交易地金额: string;
-  数据来源: string;
-  类型: string;
+  date: number; // CmbCreditCardPayment['记账日'];
+  channel: '招商银行信用卡';
+  type: string;
+  amount: number; // CmbCreditCardPayment['人民币金额'];
+  id: string; // CmbCreditCardPayment['交易日'] + CmbCreditCardPayment['交易摘要'] + CmbCreditCardPayment['人民币金额'] + CmbCreditCardPayment['卡号末四位']
 }
 
 export interface GfCreditCardPayment {
-  交易日期: string;
-  入账日期: string;
+  交易日期: string; // YYYY/MM/DD
+  入账日期: string; // YYYY/MM/DD
   交易摘要: string;
   类型: string; // 从交易摘要中提取的类型，如"消费"、"退货"等
   交易金额: string;
   交易货币: string;
   入账金额: string;
   入账货币: string;
-  数据来源: string;
+  channel: '广发银行信用卡';
+  type: GfCreditCardPayment['类型'];
+  amount: number; // GfCreditCardPayment['入账金额'];
+  date: number; // GfCreditCardPayment['入账日期'];
+  id: string; // GfCreditCardPayment['交易日期'] + GfCreditCardPayment['交易摘要'] + GfCreditCardPayment['类型'] + GfCreditCardPayment['入账金额']
 }
 
 /**
  * 支付宝数据格式
  */
 export interface AlipayPayment {
-  交易时间: string;
+  交易时间: string; // YYYY-MM-DD HH:mm:ss
   交易分类: string;
   交易对方: string;
   对方账号: string;
@@ -92,13 +125,20 @@ export interface AlipayPayment {
   交易订单号: string;
   商家订单号: string;
   备注: string;
-  数据来源: string;
+  source: '支付宝';
+  date: number; // AlipayPayment['交易时间'];
+  amount: number; // AlipayPayment['金额'];
+  type: AlipayPayment['收/支'];
+  id: string; // AlipayPayment['交易订单号']
 }
 // todo 新增枚举
 /**
  * 支付渠道类型枚举
  */
-export type PaymentChannel = '美团' | '微信支付' | '招商银行储蓄卡' | '招商银行信用卡' | '支付宝' | '广发银行信用卡';
+export type PaymentChannel = '美团余额' | '微信支付' | '招商银行储蓄卡' | '招商银行信用卡' | '支付宝' | '广发银行信用卡';
+
+export type Meituan = '美团';
+
 
 /**
  * 统一支付数据格式（所有渠道数据的联合类型）
@@ -108,7 +148,8 @@ export type PaymentData =
   | CmbDebitCardPayment
   | CmbCreditCardPayment
   | AlipayPayment
-  | GfCreditCardPayment;
+  | GfCreditCardPayment
+  | MeituanBalance;
 
 /**
  * 渠道数据组（包含渠道信息和数据）
@@ -136,20 +177,21 @@ export type AggregatedChannelData = GroupData[];
  * 匹配结果（美团订单与支付数据的配对）
  */
 export type MatchResult = {
-  '美团': MeituanOrder;
-  [key: string]: MeituanOrder | PaymentData;
+  [K in Meituan]: MeituanOrder;
+} & {
+  [K in PaymentChannel]: PaymentData;
 };
 
 /**
- * final.ts的输出格式
+ * data.ts的输出格式
  */
-export interface FinalOutput {
-  multichannel: PaymentData[];
-  match: MatchResult[];
-  unmatch: MeituanOrder[];
-  uncover: MeituanOrder[];
-}
+export type DataOutput = {
+  [K in Meituan]: MeituanOrder[];
+} & {
+  [K in PaymentChannel]: PaymentData[];
+};
 
+export type DateList = { channel: PaymentChannel; date: [string, string] }[];
 /**
  * 各渠道处理函数的统一输出格式
  */

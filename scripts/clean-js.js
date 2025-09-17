@@ -12,10 +12,10 @@ function cleanFile(filePath) {
   // 移除 Object.defineProperty 相关行
   content = content.replace(/^Object\.defineProperty\(exports, "__esModule", \{ value: true \}\);\n?/gm, '');
   
-  // 移除 exports 相关行
+  // 移除 exports 相关行，但保留内联函数
   content = content.replace(/^exports\.[^=]+ = [^;]+;\n?/gm, '');
   
-  // 移除 module.exports 相关行
+  // 移除 module.exports 相关行，但保留内联函数
   content = content.replace(/^module\.exports\.[^=]+ = [^;]+;\n?/gm, '');
   
   // 移除 __importDefault 辅助函数

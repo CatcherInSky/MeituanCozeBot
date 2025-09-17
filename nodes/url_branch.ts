@@ -3,15 +3,12 @@
  * 通过解析URL中的x-wf-file_name参数，根据文件名特征判断支付渠道类型
  */
 import { 
-  // PaymentChannel, 
+  PaymentChannel, 
   UrlBranchOutput, FunctionArgs } from '../types';
 
 type Args = FunctionArgs<{ input: string }>;
 type Output = UrlBranchOutput;
 
-
-
- type PaymentChannel = '美团' | '微信支付' | '招商银行储蓄卡' | '招商银行信用卡' | '支付宝' | '广发银行信用卡';
 /**
  * 从URL中提取文件名
  * @param url 文件URL
@@ -49,9 +46,9 @@ type Output = UrlBranchOutput;
 
   const lowerFileName = fileName.toLowerCase();
 
-  // 美团：文件名包含"美团"
-  if (lowerFileName.includes('美团')) {
-    return '美团';
+  // 美团余额：图片格式
+  if (fileName.includes('.png') || fileName.includes('.jpg') || fileName.includes('.jpeg')) {
+    return '美团余额';
   }
 
   // 微信支付：文件名包含"微信支付"或"wechat"

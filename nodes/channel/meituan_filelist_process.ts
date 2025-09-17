@@ -1,21 +1,86 @@
 // Demo数据已移至测试用例中
 import { MeituanOrder, MeituanProcessOutput, FunctionArgs } from '../../types';
+import dayjs from 'dayjs';
+
+// 内联工具函数 - 用于 Coze 节点（只支持 dayjs 导入）
+/**
+ * 将日期字符串转换为秒级时间戳
+ * @param dateStr 日期字符串
+ * @param dateRange 日期范围，用于补齐缺失的年份
+ * @returns 秒级时间戳
+ */
+function parseDateToTimestamp(dateStr: string, dateRange?: [string, string]): number {
+  if (!dateStr) return 0;
+  
+  let parsedDate: dayjs.Dayjs;
+  
+  // 处理不同格式的日期
+  if (dateStr.includes('/')) {
+    // YYYY/MM/DD 或 MM/DD 格式
+    if (dateStr.split('/').length === 2) {
+      // MM/DD 格式，需要补齐年份
+      if (dateRange && dateRange.length === 2) {
+        const startYear = dayjs(dateRange[0]).year();
+        const endYear = dayjs(dateRange[1]).year();
+        // 使用开始年份，如果月份大于开始月份则使用结束年份
+        const month = parseInt(dateStr.split('/')[0]);
+        const startMonth = dayjs(dateRange[0]).month() + 1;
+        const year = month >= startMonth ? startYear : endYear;
+        parsedDate = dayjs(`${year}/${dateStr}`);
+      } else {
+        // 没有日期范围，使用当前年份
+        parsedDate = dayjs(`${dayjs().year()}/${dateStr}`);
+      }
+    } else {
+      // YYYY/MM/DD 格式
+      parsedDate = dayjs(dateStr);
+    }
+  } else if (dateStr.includes('-')) {
+    // YYYY-MM-DD 格式
+    parsedDate = dayjs(dateStr);
+  } else {
+    // 其他格式，尝试直接解析
+    parsedDate = dayjs(dateStr);
+  }
+  
+  // 如果没有时分秒，补齐为 23:59:59
+  if (!dateStr.includes(':')) {
+    parsedDate = parsedDate.hour(23).minute(59).second(59);
+  }
+  
+  return parsedDate.unix();
+}
+
+/**
+ * 解析金额字符串，去除货币符号，保留正负号
+ * @param amountStr 金额字符串
+ * @returns 数字金额
+ */
+function parseAmount(amountStr: string): number {
+  if (!amountStr) return 0;
+  
+  // 去除货币符号（￥、$、€等）和空格
+  let cleaned = amountStr.replace(/[￥$€£¥\s]/g, '');
+  
+  // 转换为数字
+  const amount = parseFloat(cleaned);
+  
+  return isNaN(amount) ? 0 : amount;
+}
 type Args = FunctionArgs<{ input: string[] }>;
 type Output = MeituanProcessOutput;
 
-import dayjs from 'dayjs';
-
-// 去重 格式化 排序 转义 - 优化版本，减少循环次数
+// 美团订单数据处理 - 解析交易数据
 async function main({ params }: Args): Promise<Output> {
   const { input } = params;
 
-  // 用于去重的Map，键为交易单号，值为清理后的交易数据
-  const uniqueTransactions = new Map<string, any>();
+  // 存储所有交易数据
+  const transactions: any[] = [];
   const timePattern = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
   let dateRange: string[] = [];
   let foundDataStart = false;
 
-  // 单次循环完成：解析JSON、提取交易记录、去重、数据清理
+  // 解析JSON、提取交易记录
   for (const jsonString of input) {
     try {
       const parsed = JSON.parse(jsonString);
@@ -64,8 +129,8 @@ async function main({ params }: Args): Promise<Output> {
           const hasValidSuccessTime = timePattern.test(transactionData[0]);
 
           if (hasValidCreateTime && hasValidSuccessTime) {
-            // 创建交易记录并立即进行数据清理
-            const cleanedTransaction = {
+            // 创建交易记录
+            const transaction = {
               交易创建时间: content.replace(/\\t/g, '').trim(),
               交易成功时间: transactionData[0].replace(/\\t/g, '').trim(),
               交易类型: transactionData[1].replace(/\\t/g, '').trim(),
@@ -77,13 +142,14 @@ async function main({ params }: Args): Promise<Output> {
               交易单号: transactionData[7].replace(/\\t/g, '').trim(),
               商家单号: transactionData[8].replace(/\\t/g, '').trim(),
               备注: (transactionData[9] || '/').replace(/\\t/g, '').trim(),
+              channel: transactionData[4].replace(/\\t/g, '').trim(),
+              type: transactionData[1].replace(/\\t/g, '').trim(),
+              date: parseDateToTimestamp(content.replace(/\\t/g, '').trim()),
+              amount: parseAmount(transactionData[6].replace(/\\t/g, '').trim()),
+              id: transactionData[7].replace(/\\t/g, '').trim(),
             };
 
-            // 以交易单号为基准进行去重（只保留第一个）
-            const transactionId = cleanedTransaction.交易单号;
-            if (!uniqueTransactions.has(transactionId)) {
-              uniqueTransactions.set(transactionId, cleanedTransaction);
-            }
+            transactions.push(transaction);
           }
         }
       }
@@ -92,17 +158,9 @@ async function main({ params }: Args): Promise<Output> {
     }
   }
 
-  // 按交易成功时间排序并过滤退款数据
-  const output = Array.from(uniqueTransactions.values())
-    .sort((a, b) => {
-      const timeA = dayjs(a.交易成功时间);
-      const timeB = dayjs(b.交易成功时间);
-      return timeA.isBefore(timeB) ? -1 : timeA.isAfter(timeB) ? 1 : 0;
-    })
-    .filter(item => item.交易类型 === '退款');
-
+  // 直接返回所有交易数据，去重和排序留给data.ts处理
   return { 
-    output: output
+    output: transactions
   };
 }
 

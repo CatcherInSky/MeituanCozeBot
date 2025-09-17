@@ -1,5 +1,72 @@
 // 招商银行储蓄卡demo数据处理，由单个pdf解析出起止日期，还有每条交易流水详情
 import { CmbDebitCardPayment, ChannelProcessOutput, FunctionArgs } from '../../types';
+import dayjs from 'dayjs';
+
+// 内联工具函数 - 用于 Coze 节点（只支持 dayjs 导入）
+/**
+ * 将日期字符串转换为秒级时间戳
+ * @param dateStr 日期字符串
+ * @param dateRange 日期范围，用于补齐缺失的年份
+ * @returns 秒级时间戳
+ */
+function parseDateToTimestamp(dateStr: string, dateRange?: [string, string]): number {
+  if (!dateStr) return 0;
+  
+  let parsedDate: dayjs.Dayjs;
+  
+  // 处理不同格式的日期
+  if (dateStr.includes('/')) {
+    // YYYY/MM/DD 或 MM/DD 格式
+    if (dateStr.split('/').length === 2) {
+      // MM/DD 格式，需要补齐年份
+      if (dateRange && dateRange.length === 2) {
+        const startYear = dayjs(dateRange[0]).year();
+        const endYear = dayjs(dateRange[1]).year();
+        // 使用开始年份，如果月份大于开始月份则使用结束年份
+        const month = parseInt(dateStr.split('/')[0]);
+        const startMonth = dayjs(dateRange[0]).month() + 1;
+        const year = month >= startMonth ? startYear : endYear;
+        parsedDate = dayjs(`${year}/${dateStr}`);
+      } else {
+        // 没有日期范围，使用当前年份
+        parsedDate = dayjs(`${dayjs().year()}/${dateStr}`);
+      }
+    } else {
+      // YYYY/MM/DD 格式
+      parsedDate = dayjs(dateStr);
+    }
+  } else if (dateStr.includes('-')) {
+    // YYYY-MM-DD 格式
+    parsedDate = dayjs(dateStr);
+  } else {
+    // 其他格式，尝试直接解析
+    parsedDate = dayjs(dateStr);
+  }
+  
+  // 如果没有时分秒，补齐为 23:59:59
+  if (!dateStr.includes(':')) {
+    parsedDate = parsedDate.hour(23).minute(59).second(59);
+  }
+  
+  return parsedDate.unix();
+}
+
+/**
+ * 解析金额字符串，去除货币符号，保留正负号
+ * @param amountStr 金额字符串
+ * @returns 数字金额
+ */
+function parseAmount(amountStr: string): number {
+  if (!amountStr) return 0;
+  
+  // 去除货币符号（￥、$、€等）和空格
+  let cleaned = amountStr.replace(/[￥$€£¥\s]/g, '');
+  
+  // 转换为数字
+  const amount = parseFloat(cleaned);
+  
+  return isNaN(amount) ? 0 : amount;
+}
 
 // Demo数据已移至测试用例中
 type Args = FunctionArgs<{ input: string }>;
@@ -161,7 +228,11 @@ async function main({ params }: Args): Promise<Output> {
       联机余额: balance.replace(/,/g, ''), // 移除余额中的逗号
       交易摘要: transactionSummary,
       对手信息: counterparty,
-      数据来源: '招商银行储蓄卡',
+      channel: '招商银行储蓄卡',
+      date: parseDateToTimestamp(date, dateRange as [string, string]),
+      amount: parseAmount(amount.replace(/,/g, '')),
+      type: transactionSummary,
+      id: `${date}|${transactionSummary}|${amount.replace(/,/g, '')}|${counterparty}|${balance.replace(/,/g, '')}`,
     };
 
     transactions.push(cleanedTransaction);
