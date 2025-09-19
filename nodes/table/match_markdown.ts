@@ -153,7 +153,7 @@ async function main({ params }: Args): Promise<Output> {
       markdown += generateMatchTable(channel, data);
     }
     
-    return { output: markdown };
+    return { output: markdown || '没有匹配数据' };
   } catch (error) {
     console.error('Error in match_markdown.ts main function:', error);
     return { output: '生成匹配表格时发生错误' };

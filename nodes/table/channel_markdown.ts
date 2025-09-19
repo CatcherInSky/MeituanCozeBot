@@ -109,7 +109,7 @@ async function main({ params }: Args): Promise<Output> {
       }
     }
     
-    return { output: markdown };
+    return { output: markdown || '没有渠道数据' };
   } catch (error) {
     console.error('Error in channel_markdown.ts main function:', error);
     return { output: '生成渠道表格时发生错误' };
