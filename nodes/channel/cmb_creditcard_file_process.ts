@@ -95,13 +95,14 @@ function convertMonthDayToFullDate(monthDay: string, billYear: string, billMonth
 }
 
 async function main({ params }: Args): Promise<Output> {
-  const { input } = params;
+  try {
+    const { input } = params;
 
-  // 清理输入数据，但保留换行符以便处理跨行数据
-  const cleanedInput = input
-    .replace(/\r\n/g, '\n') // 统一换行符
-    .replace(/\n+/g, '\n') // 将多个换行符合并为单个换行符
-    .trim();
+    // 清理输入数据，但保留换行符以便处理跨行数据
+    const cleanedInput = input
+      .replace(/\r\n/g, '\n') // 统一换行符
+      .replace(/\n+/g, '\n') // 将多个换行符合并为单个换行符
+      .trim();
 
   const transactions: CmbCreditCardPayment[] = [];
   let dateRange: string[] = [];
@@ -283,13 +284,23 @@ async function main({ params }: Args): Promise<Output> {
     }
   }
 
-  return {
-    output: {
-      channel: '招商银行信用卡',
-      date: dateRange.length === 2 ? [dateRange[0], dateRange[1]] : [],
-      data: transactions,
-    },
-  };
+    return {
+      output: {
+        channel: '招商银行信用卡',
+        date: dateRange.length === 2 ? [dateRange[0], dateRange[1]] : [],
+        data: transactions,
+      },
+    };
+  } catch (error) {
+    console.error('Error in cmb_creditcard_file_process.ts main function:', error);
+    return {
+      output: {
+        channel: '招商银行信用卡',
+        date: [],
+        data: [],
+      },
+    };
+  }
 }
 
 export default main;

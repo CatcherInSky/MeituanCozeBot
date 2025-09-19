@@ -1,0 +1,118 @@
+// 入参类型 MatchResult
+// 出参类型，根据美团的channel划分表格，逻辑类似channel_markdown
+
+import { MeituanOrder, PaymentData, FunctionArgs, FunctionOutput } from '../../types';
+import dayjs from 'dayjs';
+
+type MatchResult = (MeituanOrder & PaymentData)[];
+type Args = FunctionArgs<{ input: MatchResult }>;
+type Output = FunctionOutput<string>;
+
+/**
+ * 将秒级时间戳转换为日期字符串
+ * @param timestamp 秒级时间戳
+ * @returns YYYY-MM-DD HH:mm:ss 格式的日期字符串
+ */
+function formatTimestamp(timestamp: number): string {
+  if (!timestamp) return '';
+  return dayjs(timestamp * 1000).format('YYYY-MM-DD HH:mm:ss');
+}
+
+/**
+ * 获取匹配结果的显示字段（排除英文key）
+ * @param data 匹配结果数据
+ * @returns 过滤后的字段对象
+ */
+function getDisplayFields(data: MeituanOrder & PaymentData): Record<string, any> {
+  const result: Record<string, any> = {};
+  
+  for (const [key, value] of Object.entries(data)) {
+    // 排除英文key（用于数据处理的字段）
+    if (key.match(/^[a-zA-Z]+$/)) {
+      continue;
+    }
+    
+    // 美团余额的date字段需要特殊处理
+    if (key === 'date' && data.channel === '美团余额' && typeof value === 'number') {
+      result[key] = formatTimestamp(value);
+    } else {
+      result[key] = value;
+    }
+  }
+  
+  return result;
+}
+
+/**
+ * 根据美团渠道分组数据
+ * @param data 匹配结果数据
+ * @returns 按渠道分组的数据
+ */
+function groupByMeituanChannel(data: MatchResult): Record<string, MatchResult> {
+  const groups: Record<string, MatchResult> = {};
+  
+  for (const item of data) {
+    const channel = item.channel || '未知渠道';
+    if (!groups[channel]) {
+      groups[channel] = [];
+    }
+    groups[channel].push(item);
+  }
+  
+  return groups;
+}
+
+/**
+ * 生成单个渠道的markdown表格
+ * @param channel 渠道名称
+ * @param data 渠道数据
+ * @returns markdown表格字符串
+ */
+function generateMatchTable(channel: string, data: MatchResult): string {
+  if (!data || data.length === 0) {
+    return `### ${channel}\n\n暂无匹配数据\n\n`;
+  }
+
+  // 获取列名（使用第一个数据项作为样本）
+  const displayFields = getDisplayFields(data[0]);
+  const columns = Object.keys(displayFields);
+  
+  // 生成表头
+  const header = `| ${columns.join(' | ')} |`;
+  const separator = `| ${columns.map(() => '---').join(' | ')} |`;
+  
+  // 生成数据行
+  const rows = data.map(item => {
+    const displayFields = getDisplayFields(item);
+    const values = columns.map(col => {
+      const value = displayFields[col];
+      if (value === null || value === undefined) return '';
+      return String(value);
+    });
+    return `| ${values.join(' | ')} |`;
+  });
+  
+  return `### ${channel}\n\n${header}\n${separator}\n${rows.join('\n')}\n\n`;
+}
+
+async function main({ params }: Args): Promise<Output> {
+  try {
+    const { input } = params;
+    let markdown = '';
+    
+    // 按美团渠道分组
+    const grouped = groupByMeituanChannel(input);
+    
+    // 遍历所有渠道
+    for (const [channel, data] of Object.entries(grouped)) {
+      markdown += generateMatchTable(channel, data);
+    }
+    
+    return { output: markdown };
+  } catch (error) {
+    console.error('Error in match_markdown.ts main function:', error);
+    return { output: '生成匹配表格时发生错误' };
+  }
+}
+
+export default main;

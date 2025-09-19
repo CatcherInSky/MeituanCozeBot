@@ -72,22 +72,23 @@ type Args = FunctionArgs<{ input: string }>;
 type Output = ChannelProcessOutput<AlipayPayment>;
 
 async function main({ params }: Args): Promise<Output> {
-  const { input } = params;
-
-  // 解析输入数据
-  let parsedData: any[][] = [];
   try {
-    parsedData = JSON.parse(input);
-  } catch (error) {
-    console.warn('Failed to parse input JSON:', error);
-    return {
-      output: {
-        channel: '支付宝',
-        date: [],
-        data: [],
-      },
-    };
-  }
+    const { input } = params;
+
+    // 解析输入数据
+    let parsedData: any[][] = [];
+    try {
+      parsedData = JSON.parse(input);
+    } catch (error) {
+      console.warn('Failed to parse input JSON:', error);
+      return {
+        output: {
+          channel: '支付宝',
+          date: [],
+          data: [],
+        },
+      };
+    }
 
   const transactions: AlipayPayment[] = [];
   let dateRange: string[] = [];
@@ -163,13 +164,23 @@ async function main({ params }: Args): Promise<Output> {
     }
   }
 
-  return {
-    output: {
-      channel: '支付宝',
-      date: dateRange.length === 2 ? [dateRange[0], dateRange[1]] : [],
-      data: transactions,
-    },
-  };
+    return {
+      output: {
+        channel: '支付宝',
+        date: dateRange.length === 2 ? [dateRange[0], dateRange[1]] : [],
+        data: transactions,
+      },
+    };
+  } catch (error) {
+    console.error('Error in alipay_file_process.ts main function:', error);
+    return {
+      output: {
+        channel: '支付宝',
+        date: [],
+        data: [],
+      },
+    };
+  }
 }
 
 export default main;

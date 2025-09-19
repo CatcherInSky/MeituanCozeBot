@@ -57,47 +57,55 @@ function processPaymentData(channelData: PaymentData[]): PaymentData[] {
 }
 
 async function main({ params }: Args): Promise<Output> {
-  const { input } = params;
-  
-  // 暂存各渠道数据（先聚合，稍后再移除空key）
-  const temp: DataOutput = {} as DataOutput;
-  const dateList = [] as DateList;
-  
-  // 遍历所有Group数据
-  for (const group of input) {
-    if (!group) continue;
+  try {
+    const { input } = params;
     
-    // 遍历Group中的每个渠道
-    for (const [groupKey, channelData] of Object.entries(group)) {
-      if (!channelData || !channelData.data) continue;
+    // 暂存各渠道数据（先聚合，稍后再移除空key）
+    const temp: DataOutput = {} as DataOutput;
+    const dateList = [] as DateList;
+    
+    // 遍历所有Group数据
+    for (const group of input) {
+      if (!group) continue;
       
-      const channel = channelData.channel;
-      const data = channelData.data;
-      const date = channelData.date;
-      dateList.push({
-        channel,
-        date,
-      })
-      Array.isArray(temp[channel]) ? temp[channel].push(...data) : temp[channel] = data;
+      // 遍历Group中的每个渠道
+      for (const [groupKey, channelData] of Object.entries(group)) {
+        if (!channelData || !channelData.data) continue;
+        
+        const channel = channelData.channel;
+        const data = channelData.data;
+        const date = channelData.date;
+        dateList.push({
+          channel,
+          date,
+        })
+        Array.isArray(temp[channel]) ? temp[channel].push(...data) : temp[channel] = data;
+      }
     }
-  }
-  
-  // 构造最终输出：只保留非空数组的key
-  const result: Partial<DataOutput> = {};
-  
-  // 动态遍历temp对象的所有key，只保留非空数组
-  for (const [key, value] of Object.entries(temp)) {
-    if (Array.isArray(value) && value.length > 0) {
-      // @ts-expect-error 动态key赋值
-      result[key as keyof DataOutput] = processPaymentData(value);
+    
+    // 构造最终输出：只保留非空数组的key
+    const result: Partial<DataOutput> = {};
+    
+    // 动态遍历temp对象的所有key，只保留非空数组
+    for (const [key, value] of Object.entries(temp)) {
+      if (Array.isArray(value) && value.length > 0) {
+        // @ts-expect-error 动态key赋值
+        result[key as keyof DataOutput] = processPaymentData(value);
+      }
     }
-  }
 
-  return {
-    // @ts-expect-error 结果为DataOutput子集，调用方按存在的key使用
-    output: result,
-    dateList,
-  };
+    return {
+      // @ts-expect-error 结果为DataOutput子集，调用方按存在的key使用
+      output: result,
+      dateList,
+    };
+  } catch (error) {
+    console.error('Error in data.ts main function:', error);
+    return {
+      output: {} as DataOutput,
+      dateList: [],
+    };
+  }
 }
 
 export default main;

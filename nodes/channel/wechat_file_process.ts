@@ -74,22 +74,23 @@ type Args = FunctionArgs<{ input: string }>;
 type Output = ChannelProcessOutput<WechatPayment>;
 
 async function main({ params }: Args): Promise<Output> {
-  const { input } = params;
-
-  // 解析输入数据
-  let parsedData: any[] = [];
   try {
-    parsedData = JSON.parse(input);
-  } catch (error) {
-    console.warn('Failed to parse input JSON:', error);
-    return {
-      output: {
-        channel: '微信支付',
-        date: [],
-        data: [],
-      },
-    };
-  }
+    const { input } = params;
+
+    // 解析输入数据
+    let parsedData: any[] = [];
+    try {
+      parsedData = JSON.parse(input);
+    } catch (error) {
+      console.warn('Failed to parse input JSON:', error);
+      return {
+        output: {
+          channel: '微信支付',
+          date: [],
+          data: [],
+        },
+      };
+    }
 
   const transactions: any[] = [];
   let dateRange: string[] = [];
@@ -173,13 +174,23 @@ async function main({ params }: Args): Promise<Output> {
     }
   }
 
-  return {
-    output: {
-      channel: '微信支付',
-      date: dateRange,
-      data: transactions,
-    },
-  };
+    return {
+      output: {
+        channel: '微信支付',
+        date: dateRange,
+        data: transactions,
+      },
+    };
+  } catch (error) {
+    console.error('Error in wechat_file_process.ts main function:', error);
+    return {
+      output: {
+        channel: '微信支付',
+        date: [],
+        data: [],
+      },
+    };
+  }
 }
 
 export default main;

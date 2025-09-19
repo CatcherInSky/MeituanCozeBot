@@ -1,4 +1,6 @@
-// Demo数据已移至测试用例中
+// 美团订单数据处理 - 专门处理退款类型的交易记录
+// 输入：美团交易账单明细的JSON字符串数组
+// 输出：过滤后的退款交易记录列表（已去重和排序）
 import { MeituanOrder, MeituanProcessOutput, FunctionArgs } from '../../types';
 import dayjs from 'dayjs';
 
@@ -67,18 +69,48 @@ function parseAmount(amountStr: string): number {
   
   return isNaN(amount) ? 0 : amount;
 }
+
+/**
+ * 根据id字段去重
+ * @param items 数据数组
+ * @returns 去重后的数组
+ */
+function deduplicateById<T extends { id?: string }>(items: T[]): T[] {
+  const seen = new Set<string>();
+  return items.filter(item => {
+    if (!item.id) return true; // 如果没有id字段，保留
+    if (seen.has(item.id)) return false;
+    seen.add(item.id);
+    return true;
+  });
+}
+
+/**
+ * 按date字段降序排序
+ * @param items 数据数组
+ * @returns 排序后的数组
+ */
+function sortByDateDesc<T extends { date?: number }>(items: T[]): T[] {
+  return items.sort((a, b) => {
+    const dateA = a.date || 0;
+    const dateB = b.date || 0;
+    return dateB - dateA; // 降序
+  });
+}
+
 type Args = FunctionArgs<{ input: string[] }>;
 type Output = MeituanProcessOutput;
 
-// 美团订单数据处理 - 解析交易数据
+// 美团订单数据处理 - 解析并过滤退款交易数据
 async function main({ params }: Args): Promise<Output> {
-  const { input } = params;
+  try {
+    const { input } = params;
 
-  // 存储所有交易数据
-  const transactions: any[] = [];
-  const timePattern = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
-  let dateRange: string[] = [];
-  let foundDataStart = false;
+    // 存储所有交易数据
+    const transactions: any[] = [];
+    const timePattern = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
+    let dateRange: string[] = [];
+    let foundDataStart = false;
 
   // 解析JSON、提取交易记录
   for (const jsonString of input) {
@@ -129,27 +161,33 @@ async function main({ params }: Args): Promise<Output> {
           const hasValidSuccessTime = timePattern.test(transactionData[0]);
 
           if (hasValidCreateTime && hasValidSuccessTime) {
-            // 创建交易记录
-            const transaction = {
-              交易创建时间: content.replace(/\\t/g, '').trim(),
-              交易成功时间: transactionData[0].replace(/\\t/g, '').trim(),
-              交易类型: transactionData[1].replace(/\\t/g, '').trim(),
-              订单标题: transactionData[2].replace(/\\t/g, '').trim(),
-              '收/支': transactionData[3].replace(/\\t/g, '').trim(),
-              支付方式: transactionData[4].replace(/\\t/g, '').trim(),
-              订单金额: transactionData[5].replace(/\\t/g, '').trim(),
-              实付金额: transactionData[6].replace(/\\t/g, '').trim(),
-              交易单号: transactionData[7].replace(/\\t/g, '').trim(),
-              商家单号: transactionData[8].replace(/\\t/g, '').trim(),
-              备注: (transactionData[9] || '/').replace(/\\t/g, '').trim(),
-              channel: transactionData[4].replace(/\\t/g, '').trim(),
-              type: transactionData[1].replace(/\\t/g, '').trim(),
-              date: parseDateToTimestamp(content.replace(/\\t/g, '').trim()),
-              amount: parseAmount(transactionData[6].replace(/\\t/g, '').trim()),
-              id: transactionData[7].replace(/\\t/g, '').trim(),
-            };
+            // 获取交易类型
+            const transactionType = transactionData[1].replace(/\\t/g, '').trim();
+            
+            // 只处理退款类型的交易
+            if (transactionType === '退款') {
+              // 创建交易记录
+              const transaction = {
+                交易创建时间: content.replace(/\\t/g, '').trim(),
+                交易成功时间: transactionData[0].replace(/\\t/g, '').trim(),
+                交易类型: transactionType,
+                订单标题: transactionData[2].replace(/\\t/g, '').trim(),
+                '收/支': transactionData[3].replace(/\\t/g, '').trim(),
+                支付方式: transactionData[4].replace(/\\t/g, '').trim(),
+                订单金额: transactionData[5].replace(/\\t/g, '').trim(),
+                实付金额: transactionData[6].replace(/\\t/g, '').trim(),
+                交易单号: transactionData[7].replace(/\\t/g, '').trim(),
+                商家单号: transactionData[8].replace(/\\t/g, '').trim(),
+                备注: (transactionData[9] || '/').replace(/\\t/g, '').trim(),
+                channel: transactionData[4].replace(/\\t/g, '').trim(),
+                type: transactionType,
+                date: parseDateToTimestamp(content.replace(/\\t/g, '').trim()),
+                amount: parseAmount(transactionData[6].replace(/\\t/g, '').trim()),
+                id: transactionData[7].replace(/\\t/g, '').trim(),
+              };
 
-            transactions.push(transaction);
+              transactions.push(transaction);
+            }
           }
         }
       }
@@ -158,10 +196,21 @@ async function main({ params }: Args): Promise<Output> {
     }
   }
 
-  // 直接返回所有交易数据，去重和排序留给data.ts处理
-  return { 
-    output: transactions
-  };
+    // 根据id去重
+    const uniqueTransactions = deduplicateById(transactions);
+    
+    // 根据date排序（降序，最新的在前）
+    const sortedTransactions = sortByDateDesc(uniqueTransactions);
+    
+    return { 
+      output: sortedTransactions
+    };
+  } catch (error) {
+    console.error('Error in meituan_filelist_process.ts main function:', error);
+    return { 
+      output: []
+    };
+  }
 }
 
 export default main;

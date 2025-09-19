@@ -104,22 +104,23 @@ type Output = UrlBranchOutput;
  * @returns 支付渠道信息
  */
 async function main({ params }: Args): Promise<Output> {
-  const { input: url } = params;
-
-  // 处理null或无效输入
-  if (!url || typeof url !== 'string') {
-    return {
-      output: '',
-    };
-  }
-
   try {
+    const { input: url } = params;
+
+    // 处理null或无效输入
+    if (!url || typeof url !== 'string') {
+      return {
+        output: '',
+      };
+    }
+
     const fileName = extractFileName(url);
 
     return {
       output: detectPaymentChannel(fileName),
     };
   } catch (error) {
+    console.error('Error in url_branch.ts main function:', error);
     return {
       output: '',
     };

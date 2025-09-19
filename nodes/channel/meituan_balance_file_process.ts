@@ -130,19 +130,30 @@ function processOCRData(ocrDataArray: MeituanBalanceOCR[]): ChannelDataGroup {
 }
 
 async function main({ params }: Args): Promise<Output> {
-  const { input } = params;
-  const data = JSON.parse(input) as MeituanBalanceOCR[];
-  // 验证输入
-  if (!data) {
-    throw new Error('输入参数不能为空');
+  try {
+    const { input } = params;
+    const data = JSON.parse(input) as MeituanBalanceOCR[];
+    // 验证输入
+    if (!data) {
+      throw new Error('输入参数不能为空');
+    }
+    
+    // 处理OCR数据
+    const result = processOCRData(data);
+    
+    return {
+      output: result
+    };
+  } catch (error) {
+    console.error('Error in meituan_balance_file_process.ts main function:', error);
+    return {
+      output: {
+        channel: '美团余额' as const,
+        date: ['', ''],
+        data: []
+      }
+    };
   }
-  
-  // 处理OCR数据
-  const result = processOCRData(data);
-  
-  return {
-    output: result
-  };
 }
 
 export default main;
