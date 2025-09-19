@@ -105,7 +105,7 @@ function generateUncoverMarkdown(data: MeituanOrder[]): string {
   const newlineChar = getNewlineChar(newlineType);
 
   if (!Array.isArray(data) || data.length === 0) {
-    return `${newlineChar}${newlineChar}没有待上传交易记录`;
+    return `${newlineChar}${newlineChar}没有需要人工核查的订单`;
   }
 
   // 分组并排序
@@ -160,10 +160,10 @@ async function main({ params }: Args): Promise<Output> {
   try {
     const { input } = params;
     const markdown = generateUncoverMarkdown(input);
-    return { output: markdown };
+    return { output: markdown};
   } catch (error) {
     console.error('Error in uncover_markdown.ts main function:', error);
-    return { output: '生成未覆盖表格时发生错误' };
+    return { output: '生成表格时发生错误' };
   }
 }
 
