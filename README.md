@@ -7,48 +7,74 @@ coze搭建AI智能体，输入美团退款订单数据以及各支付渠道数�
 MeituanCozeBot/
 ├── types/             # 统一类型定义
 │   └── index.ts
-└──script/
-    ├── channel/       # 支付渠道数据处理
-    │   ├── wechat_file_process.ts # 微信xlsx文件处理
-    │   ├── alipay_file_process.ts # 支付宝csv文件处理
-    │   ├── cmb_debitcard_file_process.ts # 招商储蓄卡pdf处理
-    │   ├── cmb_creditcard_file_process.ts # 招商信用卡pdf处理
-    │   ├── gf_creditcard_file_process.ts # 广发信用卡pdf处理
-    │   └── meituan_filelist_process.ts # 美团csv列表处理
-    ├── coverage.ts       # 判断未被支付渠道数据覆盖的美团数据
-    ├── data.ts       # 合并数据形成统一表格
-    └── url_branch.ts  # 分支检测
+├── nodes/             # 核心业务逻辑节点
+│   ├── channel/       # 支付渠道数据处理
+│   │   ├── wechat_file_process.ts # 微信xlsx文件处理
+│   │   ├── alipay_file_process.ts # 支付宝csv文件处理
+│   │   ├── cmb_debitcard_file_process.ts # 招商储蓄卡pdf处理
+│   │   ├── cmb_creditcard_file_process.ts # 招商信用卡pdf处理
+│   │   ├── gf_creditcard_file_process.ts # 广发信用卡pdf处理
+│   │   ├── meituan_balance_file_process.ts # 美团余额图片ocr后数据处理
+│   │   └── meituan_filelist_process.ts # 美团csv列表处理
+│   ├── table/         # 表格生成器
+│   │   ├── channel_markdown.ts # 渠道数据markdown表格
+│   │   ├── match_markdown.ts # 匹配数据markdown表格
+│   │   ├── meituan_markdown.ts # 美团数据markdown表格
+│   │   ├── uncover_markdown.ts # 未覆盖数据markdown表格
+│   │   └── unmatch_markdown.ts # 未匹配数据markdown表格
+│   ├── analysis.ts    # 数据分析主流程
+│   ├── before_download.ts # 下载前处理
+│   ├── data.ts        # 数据合并处理
+│   └── url_branch.ts  # 分支检测
+├── plugins/           # Coze插件
+│   ├── csv_parser_node.py # CSV解析器（节点版）
+│   ├── csv_parser_plugin.py # CSV解析器（插件版）
+│   ├── excel_generator_node.py # Excel生成器（节点版）
+│   └── excel_generator_plugin.py # Excel生成器（插件版）
+├── dist/              # 编译后的JavaScript文件
+├── demo/              # 演示数据和测试用例
+├── docs/              # 文档目录
+├── markdown/          # Markdown模板
+├── prompts/           # 提示词模板
+├── scripts/           # 构建脚本
+└── test/              # 测试文件
 
 ```
 
 # 数据流向
-由process处理不同的支付渠道数据以及美团退款订单数据
-由data汇总
-由coverage判断未被支付渠道数据覆盖的美团数据
-经过prompt判断在被覆盖的退款订单数据中，哪些是未被匹配的
+1. **文件上传** → 各支付渠道原始文件（xlsx/csv/pdf）
+2. **文件解析** → 通过channel/目录下的process文件解析为统一格式
+3. **数据合并** → 通过data.ts汇总所有渠道数据
+4. **覆盖分析** → 通过analysis.ts判断未被支付渠道数据覆盖的美团数据
+5. **匹配分析** → 在已覆盖的订单中，通过匹配算法找出未匹配的订单
+6. **结果输出** → 通过table/目录下的markdown生成器输出分析结果
+7. **文件导出** → 通过plugins/目录下的excel生成器导出Excel文件
 
 # 如何新增渠道
 ## 代码修改
-### 类型文件
-新增对应payment类型数据
-修改PaymentChannel
-修改PaymentData
+### 类型文件 (types/index.ts)
+- 新增对应payment类型数据
+- 修改PaymentChannel枚举
+- 修改PaymentData联合类型
 
-### url_branch
-detectPaymentChannel方法新增新渠道的判断语句以及枚举值
+### 分支检测 (nodes/url_branch.ts)
+- detectPaymentChannel方法新增新渠道的判断语句以及枚举值
 
-### file_process
-channel文件夹下新增根据对应类型数据处理之后（csv xlsx pdf等），完善解析表单数据的函数
-根据demo解析数据，更新isOrderMatchPaymentData匹配策略
+### 文件处理 (nodes/channel/)
+- 新增对应的file_process.ts文件
+- 根据文件类型（csv/xlsx/pdf等）完善解析函数
+- 根据demo数据更新匹配策略
+
 
 
 
 ## 工作流修改
-### money_data_process
-在循环体中修改所有和ts文件名字相同的代码节点
-在选择器和变量聚合节点中添加对应的判断分支
-根据渠道文件类型新增文件解析器
-将对应file_process代码节点添加到解析器后面
+### Coze工作流配置
+1. **文件解析节点**：根据渠道文件类型新增对应的文件解析器
+2. **代码节点**：添加对应的file_process.ts代码节点到解析器后面
+3. **分支选择器**：在url_branch节点中添加新渠道的判断分支
+4. **数据聚合**：确保新渠道数据能正确聚合到最终结果中
+5. **输出节点**：根据需要添加对应的markdown生成器节点
 
 
 # demo数据说明
@@ -87,15 +113,3 @@ demo文件夹存放不同类型的账单数据，以及他们经过解析之后�
 https://www.coze.cn/open/docs/guides/ide
 注：插件开发无法使用requests_async这个依赖
 
-# 导出周期
-美团 - 3个月
-微信 - 3个月
-支付宝 - 12个月
-招商银行储蓄卡 - 12个月
-信用卡 - 1个月
-# todo
-单渠道多卡
-非人民币
-中行是加密pdf，暂时无法解析
-新增其他渠道
-美团月付和余额不支持导出记录，只能OCR支持
