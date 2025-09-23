@@ -59,8 +59,8 @@ function parseDateToTimestamp(dateStr: string, dateRange?: [string, string]): nu
 function parseAmount(amountStr: string): number {
   if (!amountStr) return 0;
   
-  // 去除货币符号（￥、$、€等）和空格
-  let cleaned = amountStr.replace(/[￥$€£¥\s]/g, '');
+  // 去除货币符号（￥、$、€等）、空格和千位分隔符逗号
+  let cleaned = amountStr.replace(/[￥$€£¥\s,]/g, '');
   
   // 转换为数字
   const amount = parseFloat(cleaned);
@@ -107,15 +107,13 @@ async function main({ params }: Args): Promise<Output> {
     dateRange = [startDate, endDate];
   }
 
-  // 查找数据解析范围：从第一个表头到"用卡安全温馨提示："
+  // 查找数据解析范围：处理多页数据
   const startMarker = '交易日期入账日期交易摘要交易金额交易货币入账金额入账货币';
   const endMarker = '用卡安全温馨提示：';
   
   const startIndex = cleanedInput.indexOf(startMarker);
-  const endIndex = cleanedInput.indexOf(endMarker);
-  
-  if (startIndex === -1 || endIndex === -1 || startIndex >= endIndex) {
-    console.warn('Could not find data boundaries in GF credit card statement');
+  if (startIndex === -1) {
+    console.warn('Could not find data start marker in GF credit card statement');
     return {
       output: {
         channel: '广发银行信用卡',
@@ -125,8 +123,16 @@ async function main({ params }: Args): Promise<Output> {
     };
   }
 
-  // 提取交易数据区域
-  const dataSection = cleanedInput.substring(startIndex, endIndex);
+  // 找到最后一个结束标记，以支持多页数据
+  let lastEndIndex = cleanedInput.lastIndexOf(endMarker);
+  if (lastEndIndex === -1 || lastEndIndex <= startIndex) {
+    // 如果没有找到结束标记，使用整个文档
+    lastEndIndex = cleanedInput.length;
+    console.warn('Could not find end marker, processing entire document');
+  }
+
+  // 提取交易数据区域（从第一个开始标记到最后一个结束标记）
+  const dataSection = cleanedInput.substring(startIndex, lastEndIndex);
   
   // 按行分割数据
   const lines = dataSection.split('\n').filter(line => line.trim());
@@ -149,12 +155,17 @@ async function main({ params }: Args): Promise<Output> {
     }
   }
   
-  // 查找分页标识位置
+  // 查找分页标识位置，用于调试和验证
   const pageIndices: number[] = [];
   for (let i = 0; i < lines.length; i++) {
-    if (lines[i].match(/^\d+\/3$/)) {
+    if (lines[i].match(/^\d+\/\d+$/)) { // 匹配 "1/3", "2/3", "3/3" 等格式
       pageIndices.push(i);
     }
+  }
+  
+  // 输出分页信息用于调试
+  if (pageIndices.length > 0) {
+    console.log(`Found ${pageIndices.length} page markers, processing multi-page document`);
   }
   
   // 如果没找到表头，尝试查找卡号行作为数据开始位置
@@ -178,11 +189,8 @@ async function main({ params }: Args): Promise<Output> {
     };
   }
 
-  // 解析交易数据（所有表头后的数据）
-  // 广发银行数据格式：每3行为一组交易记录
-  // 第1行：交易日期+入账日期
-  // 第2行：交易类型+交易摘要
-  // 第3行：交易金额+货币+入账金额+货币
+  // 解析交易数据 - 改进的逐行扫描方式
+  // 广发银行数据格式：每个交易记录包含日期行，后续是摘要和金额行（可能跨多行）
   
   // 处理每个表头区域的数据
   for (let headerIdx = 0; headerIdx < headerIndices.length; headerIdx++) {
@@ -210,36 +218,84 @@ async function main({ params }: Args): Promise<Output> {
       }
     }
     
-    for (let i = startLine; i < endIndex - 2; i += 3) {
+    // 逐行扫描，寻找日期行作为交易记录的开始
+    for (let i = startLine; i < endIndex; i++) {
       try {
-        const dateLine = lines[i].trim();
-        const summaryLine = lines[i + 1]?.trim() || '';
-        const amountLine = lines[i + 2]?.trim() || '';
+        const currentLine = lines[i]?.trim() || '';
         
         // 跳过空行和非交易数据行
-        if (!dateLine || !summaryLine || !amountLine || 
-            dateLine.includes('卡号：') || dateLine.includes('交易明细') ||
-            summaryLine.includes('交易明细') || summaryLine.includes('卡号：') ||
-            amountLine.includes('交易明细') || amountLine.includes('卡号：')) {
+        if (!currentLine || 
+            currentLine.includes('卡号：') || currentLine.includes('交易明细') ||
+            currentLine.match(/^\d+\/\d+$/)) {
           continue;
         }
 
-        // 解析交易日期和入账日期 (YYYY/MM/DD格式)
-        const dateMatch = dateLine.match(/^(\d{4}\/\d{2}\/\d{2})(\d{4}\/\d{2}\/\d{2})/);
+        // 检查是否是日期行
+        const dateMatch = currentLine.match(/^(\d{4}\/\d{2}\/\d{2})(\d{4}\/\d{2}\/\d{2})/);
         if (!dateMatch) continue;
         
         const transactionDate = dateMatch[1];
         const postingDate = dateMatch[2];
         
+        // 从下一行开始收集摘要和金额信息
+        let summaryParts: string[] = [];
+        let amountLine = '';
+        let j = i + 1;
+        
+        // 收集后续行直到找到金额行或下一个日期行
+        while (j < endIndex) {
+          const nextLine = lines[j]?.trim() || '';
+          
+          // 如果遇到下一个日期行，停止收集
+          if (nextLine.match(/^(\d{4}\/\d{2}\/\d{2})(\d{4}\/\d{2}\/\d{2})/)) {
+            break;
+          }
+          
+          // 跳过分页标识和其他非内容行
+          if (nextLine.match(/^\d+\/\d+$/) || 
+              nextLine.includes('卡号：') || 
+              nextLine.includes('交易明细') ||
+              !nextLine) {
+            j++;
+            continue;
+          }
+          
+            // 检查是否包含金额（人民币）
+            if (nextLine.includes('人民币')) {
+              // 检查是否是标准的金额行格式（支持千位分隔符逗号）
+              const amountMatch = nextLine.match(/(-?[\d,]+\.?\d*)\s*人民币(-?[\d,]+\.?\d*)\s*人民币/);
+            if (amountMatch) {
+              amountLine = nextLine;
+              break;
+            } else {
+              // 可能是摘要中包含"人民币"，继续收集
+              summaryParts.push(nextLine);
+            }
+          } else {
+            // 摘要行
+            summaryParts.push(nextLine);
+          }
+          
+          j++;
+        }
+        
+        // 如果没有找到金额行，跳过这个交易
+        if (!amountLine) {
+          continue;
+        }
+        
+        // 合并摘要部分
+        const fullSummary = summaryParts.join(' ').trim();
+        
         // 解析交易类型和摘要
-        const typeMatch = summaryLine.match(/^\(([^)]+)\)(.+)/);
+        const typeMatch = fullSummary.match(/^\(([^)]+)\)(.+)/);
         if (!typeMatch) continue;
         
         const transactionType = typeMatch[1];
         const summary = typeMatch[2].trim();
         
-        // 解析金额：格式如 "8.49 人民币8.49 人民币"
-        const amountMatch = amountLine.match(/(-?\d+\.?\d*)\s*人民币(-?\d+\.?\d*)\s*人民币/);
+        // 解析金额（支持千位分隔符逗号）
+        const amountMatch = amountLine.match(/(-?[\d,]+\.?\d*)\s*人民币(-?[\d,]+\.?\d*)\s*人民币/);
         if (!amountMatch) continue;
         
         const transactionAmount = amountMatch[1];
@@ -262,6 +318,10 @@ async function main({ params }: Args): Promise<Output> {
         };
 
         transactions.push(transaction);
+        
+        // 跳转到金额行之后继续处理
+        i = j;
+        
       } catch (error) {
         console.warn('Error parsing GF credit card transaction:', error, lines[i]);
       }
